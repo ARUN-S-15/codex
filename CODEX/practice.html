@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Practice Challenges</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style/practice.css">
+</head>
+
+<body>
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">⚡ CODEX ⚡</div>
+    <ul>
+      <li><a href="home.html">Home</a></li>
+      <li><a href="history.html">History</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="practice.html" class="active">Practice</a></li>
+    </ul>
+  </nav>
+
+  <!-- HEADER -->
+  <header>
+    <h1>💡 Practice Challenges</h1>
+    <p>Sharpen your coding skills with curated problems in multiple languages.</p>
+  </header>
+
+  <!-- LANGUAGE FILTER -->
+  <section class="filter">
+    <label for="language">Choose Language: </label>
+    <select id="language">
+      <option value="all">All</option>
+      <option value="c">C</option>
+      <option value="cpp">C++</option>
+      <option value="python">Python</option>
+      <option value="java">Java</option>
+    </select>
+  </section>
+
+  <!-- CHALLENGES GRID -->
+  <section class="challenges">
+    <div class="challenge-card" data-lang="c cpp python java" data-difficulty="easy">
+      <h2>1. Reverse a String</h2>
+      <p>Write a program that takes a string and prints it reversed.</p>
+      <span class="badge easy">Easy</span>
+      <a href="compiler.html" class="btn">Solve Now</a>
+    </div>
+
+    <div class="challenge-card" data-lang="c cpp java" data-difficulty="medium">
+      <h2>2. Fibonacci Series</h2>
+      <p>Generate the first N Fibonacci numbers.</p>
+      <span class="badge medium">Medium</span>
+      <a href="compiler.html" class="btn">Solve Now</a>
+    </div>
+
+    <div class="challenge-card" data-lang="python java cpp" data-difficulty="hard">
+      <h2>3. Balanced Brackets</h2>
+      <p>Check if a string of brackets is balanced.</p>
+      <span class="badge hard">Hard</span>
+      <a href="compiler.html" class="btn">Solve Now</a>
+    </div>
+
+    <div class="challenge-card" data-lang="c cpp python java" data-difficulty="medium">
+      <h2>4. Sum of Digits</h2>
+      <p>Find the sum of digits of a given number.</p>
+      <span class="badge medium">Medium</span>
+      <a href="compiler.html" class="btn">Solve Now</a>
+    </div>
+
+    <div class="challenge-card" data-lang="python" data-difficulty="hard">
+      <h2>5. Word Frequency Counter</h2>
+      <p>Count how many times each word appears in a paragraph.</p>
+      <span class="badge hard">Hard</span>
+      <a href="compiler.html" class="btn">Solve Now</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>© 2025 CODEX. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Filter Challenges by Language
+    const languageSelect = document.getElementById("language");
+    const challengeCards = document.querySelectorAll(".challenge-card");
+
+    languageSelect.addEventListener("change", () => {
+      const selectedLang = languageSelect.value;
+      challengeCards.forEach(card => {
+        if (selectedLang === "all" || card.dataset.lang.includes(selectedLang)) {
+          card.style.display = "block";
+        } else {
+          card.style.display = "none";
+        }
+      });
+    });
+  </script>
+</body>
+</html>
