@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: #000;
+      color: #fff;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    nav .logo {
+      font-weight: 700;
+      font-size: 1.3rem;
+      color: #10a37f;
+    }
+
+    nav ul {
+      display: flex;
+      list-style: none;
+      gap: 1.5rem;
+    }
+
+    nav ul li a {
+      text-decoration: none;
+      color: #ececf1;
+      font-weight: 500;
+    }
+
+    nav ul li a.active {
+      color: #10a37f;
+    }
+    /* Sidebar (History) */
+    .sidebar {
+      width: 250px;
+      background: #111;
+      border-right: 1px solid #2a2b32;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      z-index: 5;
+    }
+    .sidebar.hidden {
+      transform: translateX(-100%);
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background: #202123;
+      border-bottom: 1px solid #2a2b32;
+    }
+    .sidebar-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: #10a37f;
+    }
+    .sidebar-header button {
+      background: none;
+      border: none;
+      color: #10a37f;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+      padding: 0.5rem;
+      margin: 0;
+    }
+    .history-list li {
+      padding: 0.5rem;
+      margin-bottom: 0.3rem;
+      background: #1d1d1d;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .history-list li:hover {
+      background: #2a2b32;
+    }
+
+    /* Reopen button (when sidebar hidden) */
+    .reopen-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 0.4rem 0.8rem;
+      background: #10a37f;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: none;
+      z-index: 10;
+    }
+
+    /* Main editor area */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      padding: 1rem;
+      gap: 1rem;
+      position: relative;
+    }
+
+    .editor-wrapper {
+      position: relative;
+      flex: 0 0 50%; /* Always 50% width */
+      display: flex;
+    }
+    .editor-container {
+      display: flex;
+      position: relative;
+      flex: 1;
+    }
+
+    /* Line numbers */
+    .line-numbers {
+      background: #2a2b32;
+      color: #9ca3af;
+      padding: 1rem 0.5rem;
+      text-align: right;
+      font-family: monospace;
+      font-size: 1rem;
+      border-radius: 10px 0 0 10px;
+      user-select: none;
+      white-space: pre;
+      line-height: 2;
+    }
+
+    /* Textarea editor */
+    .editor-container textarea {
+      flex: 1;
+      background: #1d1d1d;
+      color: #ececf1;
+      border: none;
+      border-radius: 0 10px 10px 0;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 1rem;
+      resize: none;
+      line-height: 1.4rem;
+      border-color: #000;
+    }
+
+    /* Copy Button */
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 0.4rem 0.8rem;
+      background: #10a37f;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s ease;
+    }
+    .copy-btn:hover {
+      background: #0d8b6d;
+    }
+
+    /* Optimize Button */
+    .btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 0.8rem 1.5rem;
+      background: #10a37f;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s ease;
+    }
+    .btn:hover {
+      background: #0d8b6d;
+    }
+
+    /* Optimized editor (hidden initially) */
+    #optimizedWrapper {
+      display: none;
+      flex: 0 0 50%; /* Always 50% */
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h3>History</h3>
+      <button id="closeSidebarBtn">✖</button>
+    </div>
+    <ul class="history-list" id="historyList">
+      <li>No history yet...</li>
+    </ul>
+  </aside>
+
+  <!-- Reopen Sidebar Button -->
+  <button id="reopenBtn" class="reopen-btn">📜 History</button>
+  
+  <!-- Main Editor -->
+  <div class="main">
+    <!-- User Code Box -->
+    <div class="editor-wrapper" id="inputWrapper">
+      <div class="editor-container">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <textarea id="codeInput" placeholder="Write or paste your code here..."></textarea>
+        <button class="copy-btn" id="copyInputBtn">Copy</button>
+      </div>
+      <button id="optimizeBtn" class="btn">🚀 Optimize</button>
+    </div>
+
+    <!-- Optimized Code Box -->
+    <div class="editor-wrapper" id="optimizedWrapper">
+      <div class="editor-container">
+        <div class="line-numbers" id="lineNumbersOut">1</div>
+        <textarea id="optimizedCode" readonly></textarea>
+        <button class="copy-btn" id="copyOutputBtn">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const textarea = document.getElementById("codeInput");
+    const lineNumbers = document.getElementById("lineNumbers");
+    const optimizedCodeBox = document.getElementById("optimizedCode");
+    const lineNumbersOut = document.getElementById("lineNumbersOut");
+    const historyList = document.getElementById("historyList");
+    const optimizedWrapper = document.getElementById("optimizedWrapper");
+    const sidebar = document.getElementById("sidebar");
+    const closeSidebarBtn = document.getElementById("closeSidebarBtn");
+    const reopenBtn = document.getElementById("reopenBtn");
+
+    // Update line numbers
+    function updateLineNumbers(textarea, lineBox) {
+      const lines = textarea.value.split("\n").length;
+      lineBox.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
+    }
+
+    textarea.addEventListener("input", () => updateLineNumbers(textarea, lineNumbers));
+    textarea.addEventListener("scroll", () => (lineNumbers.scrollTop = textarea.scrollTop));
+    optimizedCodeBox.addEventListener("scroll", () => (lineNumbersOut.scrollTop = optimizedCodeBox.scrollTop));
+    updateLineNumbers(textarea, lineNumbers);
+
+    // Optimize mock function
+    document.getElementById("optimizeBtn").addEventListener("click", () => {
+      const code = textarea.value.trim();
+      if (!code) {
+        alert("⚠️ Please write or paste some code first.");
+        return;
+      }
+
+      optimizedCodeBox.value = code + 
+        "\n\n// 🚀 Optimized version:\n// - Loops simplified\n// - Variables reduced\n// - Conditions optimized";
+
+      optimizedWrapper.style.display = "flex";
+      updateLineNumbers(optimizedCodeBox, lineNumbersOut);
+
+      // Add entry to history
+      if (historyList.firstElementChild.textContent === "No history yet...") {
+        historyList.innerHTML = "";
+      }
+      const li = document.createElement("li");
+      li.textContent = "Run at " + new Date().toLocaleTimeString();
+      historyList.appendChild(li);
+    });
+
+    // Copy Input
+    document.getElementById("copyInputBtn").addEventListener("click", () => {
+      navigator.clipboard.writeText(textarea.value);
+      alert("Copied input code!");
+    });
+
+    // Copy Output
+    document.getElementById("copyOutputBtn").addEventListener("click", () => {
+      navigator.clipboard.writeText(optimizedCodeBox.value);
+      alert("Copied optimized code!");
+    });
+
+    // Sidebar controls
+    closeSidebarBtn.addEventListener("click", () => {
+      sidebar.classList.add("hidden");
+      reopenBtn.style.display = "block";
+    });
+    reopenBtn.addEventListener("click", () => {
+      sidebar.classList.remove("hidden");
+      reopenBtn.style.display = "none";
+    });
+  </script>
+</body>
+</html>

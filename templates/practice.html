@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Practice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: #0d0d0d;
+      color: #f1f1f1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* NAVBAR */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: #1a1a1a;
+      border-bottom: 1px solid #333;
+    }
+
+    nav .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #10a37f;
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 1.2rem;
+    }
+
+    nav ul li a {
+      text-decoration: none;
+      color: #bbb;
+      font-weight: 500;
+    }
+
+    nav ul li a.active {
+      color: #10a37f;
+    }
+
+    /* MAIN LAYOUT */
+    .main {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 70px);
+    }
+
+    /* Problem Section */
+    .problem {
+      flex: 0.45;
+      background: #111;
+      padding: 1.5rem;
+      border-right: 1px solid #333;
+      overflow-y: auto;
+    }
+
+    .problem h2 {
+      margin-top: 0;
+      color: #47aee5;
+    }
+
+    .example, .constraints {
+      margin-top: 1rem;
+      background: #1c1c1c;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #333;
+    }
+
+    /* Editor Section */
+    .editor {
+      flex: 0.55;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+    }
+
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+
+    select {
+      background: #1e1e1e;
+      color: #f1f1f1;
+      border: 1px solid #333;
+      padding: 0.4rem;
+      border-radius: 6px;
+    }
+
+    .editor-box {
+      position: relative;
+      flex: 1;
+      display: flex;
+      margin-bottom: 0.7rem;
+    }
+
+   .line-numbers {
+      background: #2a2b32;
+      color: #9ca3af;
+      padding: 1rem 0.5rem;
+      text-align: right;
+      font-family: monospace;
+      font-size: 1rem;
+      border-radius: 10px 0 0 10px;
+      user-select: none;
+      white-space: pre;
+      line-height: 2;
+    }
+    textarea {
+      flex: 1;
+      background: #1d1d1d;
+      color: #f1f1f1;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 1rem;
+      resize: none;
+      outline: none;
+      line-height: 1.6rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 0.7rem;
+    }
+
+    button {
+      background: #10a37f;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #0d8b6d;
+    }
+
+    .console {
+      background: #111;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #333;
+      flex: 0.4;
+      overflow-y: auto;
+      font-family: monospace;
+    }
+
+    footer {
+      text-align: center;
+      padding: 0.7rem;
+      border-top: 1px solid #333;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">⚡ CODEX ⚡</div>
+    <ul>
+      <li><a href="{{ url_for('main') }}">History</a></li>
+      <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#">Contact</a></li>
+      <li><a href="{{ url_for('login') }}">Login</a></li>
+      <li><a href="{{ url_for('login') }}">Logout</a></li>
+    </ul>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- Problem -->
+    <div class="problem">
+      <h2>1. Reverse a String</h2>
+      <p>Write a function that reverses a given string.</p>
+
+      <div class="example">
+        <h3>Example</h3>
+        <pre>Input: "hello"
+Output: "olleh"</pre>
+      </div>
+
+      <div class="constraints">
+        <h3>Constraints</h3>
+        <ul>
+          <li>1 ≤ string length ≤ 1000</li>
+          <li>String consists of printable ASCII characters.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor">
+      <div class="editor-header">
+        <label for="language">Language: </label>
+        <select id="language">
+          <option>C</option>
+          <option>C++</option>
+          <option>Python</option>
+          <option>Java</option>
+        </select>
+      </div>
+
+      <div class="editor-box">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <textarea id="codeInput" placeholder="Write your solution here..."></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="runBtn">▶ Run</button>
+        <button id="submitBtn">✅ Submit</button>
+      </div>
+
+      <div class="console" id="consoleOutput">Console output will appear here...</div>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2025 CODEX. All rights reserved.</p>
+  </footer>
+
+  <script>
+    const textarea = document.getElementById("codeInput");
+    const lineNumbers = document.getElementById("lineNumbers");
+    const consoleOutput = document.getElementById("consoleOutput");
+
+    textarea.addEventListener("input", () => {
+      const lines = textarea.value.split("\n").length;
+      lineNumbers.textContent = Array.from({length: lines}, (_, i) => i + 1).join("\n");
+    });
+
+    document.getElementById("runBtn").addEventListener("click", () => {
+      consoleOutput.textContent = "⚡ Running your code...\nOutput: olleh";
+    });
+
+    document.getElementById("submitBtn").addEventListener("click", () => {
+      consoleOutput.textContent = "✅ Submitted! All test cases passed.";
+    });
+  </script>
+</body>
+</html>

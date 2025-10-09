@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CODEX — Online Compiler</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      background: black;
+      color: white;
+    }
+    .sidebar {
+      width: 280px;
+      background: #202123;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 0;
+      border-right: 1px solid #2a2b32;
+    }
+    .sidebar-section {
+      padding: 0 1rem;
+      margin-bottom: 1rem;
+    }
+    .sidebar button,
+    .sidebar .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #ececf1;
+      padding: 0.7rem 1rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      text-align: left;
+      cursor: pointer;
+    }
+    .sidebar button:hover,
+    .sidebar .menu-item:hover {
+      background: #2a2b32;
+    }
+    .sidebar h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #9ca3af;
+      margin: 1rem 1rem 0.5rem;
+      text-transform: uppercase;
+    }
+    .search-box {
+      background: #2a2b32;
+      border: 1px solid #565869;
+      border-radius: 6px;
+      padding: 0.6rem;
+      color: #fff;
+      margin: 0 1rem 1rem;
+      width: calc(100% - 2rem);
+    }
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 1rem;
+    }
+    .history-item {
+      display: block;
+      width: 100%;
+      background: transparent;
+      border: none;
+      text-align: left;
+      color: #ddd;
+      font-size: 0.9rem;
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 0.3rem;
+    }
+    .history-item:hover {
+      background: #2a2b32;
+    }
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .section {
+      background: #40414f;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+    select {
+      background: #2a2b32;
+      color: #ececf1;
+      border: 1px solid #565869;
+      border-radius: 50px;
+      padding: 0.7rem 1.5rem;
+      font-size: 1rem;
+    }
+    textarea {
+      width: 90%;
+      flex: 1;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 1rem;
+      background: #1d1d1d;
+      color: #ececf1;
+      border: none;
+      border-radius: 0 5px 5px 0;
+      resize: none;
+      min-height: 70vh;
+      line-height: 1.5rem;
+      outline: none;
+    }
+    .line-numbers {
+      background: #2a2b32;
+      color: #9ca3af;
+      padding: 1rem 0.5rem;
+      text-align: right;
+      font-family: monospace;
+      font-size: 1rem;
+      border-radius: 5px 0 0 5px;
+      user-select: none;
+      white-space: pre;
+      line-height: 1.5rem;
+      overflow: hidden;
+    }
+    .editor-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      min-height: 70vh;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+    .btn--primary {
+      background: #10a37f;
+      color: #fff;
+    }
+    .btn--outline {
+      background: transparent;
+      border: 1px solid #565869;
+      color: #ececf1;
+    }
+    .btn--outline:hover {
+      background: #2a2b32;
+    }
+    .hidden {
+      display: none !important;
+    }
+    pre {
+      background: #202123;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin-top: 1rem;
+      flex: 1;
+    }
+    #copyCodeBtn {
+      background-color: transparent;
+      border: 1px solid #565869;
+      color: #ececf1;
+      font-size: 1rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #copyCodeBtn:hover {
+      background: #2a2b32;
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <button id="newCodeBtn">📝 New Code</button>
+      <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search codes...">
+    </div>
+    
+    <h2>History</h2>
+    <div class="history-list" id="historyList">
+      <p style="font-size:0.85rem;color:#777;">No history yet...</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="section">
+      <div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+        <h2>Code Editor</h2>
+       <select id="languageSelect">
+  <option value="71">Python</option>
+  <option value="50">C </option>
+  <option value="54">C++</option>
+  <option value="63">JavaScript (Node.js 12.14.0)</option>
+  <option value="62">Java (OpenJDK 13.0.1)</option>
+</select>
+      </div>
+      <div class="editor-container">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <textarea id="codeEditor" placeholder="Write your code here..."></textarea>
+      </div>
+      <div style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
+  <button id="copyCodeBtn">Copy</button>
+  <button id="runBtn" class="btn btn--primary">Run Code</button>
+  <button id="explainBtn" class="btn btn--outline">Explain Code</button>
+
+  <button id="debugBtn" class="btn btn--outline" onclick="window.location.href='/debug'">🪲 Debug</button>
+  <button id="optimizeBtn" class="btn btn--outline" onclick="window.location.href='/optimizer'">⚙️ Optimize</button>
+  <button id="practiceBtn" class="btn btn--outline" onclick="window.location.href='/practice'">🏋️ Practice</button>
+</div>
+
+    </div>
+
+    <div class="section hidden" id="resultSection">
+      <h2 id="resultTitle">Output</h2>
+      <pre id="resultBox">Your output will appear here...</pre>
+    </div>
+
+    <div class="section hidden" id="explanationSection">
+      <h2>Live Explanation</h2>
+      <pre id="explanationBox">Explanation will appear while typing...</pre>
+    </div>
+  </main>
+
+  <!-- ✅ Better: move JS into a separate file -->
+  <script src="{{ url_for('static', filename='js/compiler.js') }}"></script>
+</body>
+</html>

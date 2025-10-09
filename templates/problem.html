@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Problems</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/problem.css') }}">
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">⚡ CODEX ⚡</div>
+    <ul>
+          <li><a href="{{ url_for('home') }}" class="active">Home</a></li>
+      <li><a href="{{ url_for('main') }}">History</a></li>
+      <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#">Contact</a></li>
+      <li><a href="{{ url_for('login') }}">Login</a></li>
+      <li><a href="{{ url_for('login') }}">Logout</a></li>
+    </ul>
+  </nav>
+
+  <!-- HEADER -->
+  <header>
+    <h1>📚 Problems</h1>
+    <p>Choose from thousands of problems and start solving!</p>
+  </header>
+
+  <!-- FILTERS -->
+  <section class="filters">
+    <input type="text" id="searchBox" placeholder="🔍 Search problems...">
+    <select id="difficultyFilter">
+      <option value="all">All Difficulties</option>
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+  </section>
+
+  <!-- MAIN CONTAINER -->
+  <section class="problem-container">
+    <!-- PROBLEM TABLE -->
+    <div class="problem-list">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Difficulty</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="problemTable">
+          <tr>
+            <td>1</td>
+            <td><a href="practice.html?id=1">Reverse a String</a></td>
+            <td><span class="badge easy">Easy</span></td>
+            <td>❌</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><a href="practice.html?id=2">Fibonacci Series</a></td>
+            <td><span class="badge medium">Medium</span></td>
+            <td>✔</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><a href="practice.html?id=3">Balanced Brackets</a></td>
+            <td><span class="badge hard">Hard</span></td>
+            <td>❌</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- STREAK BOARD -->
+    <aside class="streak-board">
+      <h2>🔥 Streak Board</h2>
+      <div class="streak-card">
+        <p>Current Streak</p>
+        <h3>7 Days</h3>
+      </div>
+      <div class="streak-card">
+        <p>Longest Streak</p>
+        <h3>15 Days</h3>
+      </div>
+      <div class="streak-card">
+        <p>Problems Solved</p>
+        <h3>42</h3>
+      </div>
+
+      <div class="progress">
+        <p>Daily Goal: 2/3</p>
+        <div class="progress-bar">
+          <div class="fill" style="width: 66%;"></div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>© 2025 CODEX. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Search + Filter
+    const searchBox = document.getElementById("searchBox");
+    const difficultyFilter = document.getElementById("difficultyFilter");
+    const rows = document.querySelectorAll("#problemTable tr");
+
+    function filterProblems() {
+      const searchText = searchBox.value.toLowerCase();
+      const difficulty = difficultyFilter.value;
+
+      rows.forEach(row => {
+        const title = row.cells[1].innerText.toLowerCase();
+        const diff = row.cells[2].innerText.toLowerCase();
+
+        if ((title.includes(searchText)) &&
+            (difficulty === "all" || diff.includes(difficulty))) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
+    }
+
+    searchBox.addEventListener("input", filterProblems);
+    difficultyFilter.addEventListener("change", filterProblems);
+  </script>
+</body>
+</html>
