@@ -4,7 +4,60 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CODEX - Optimizer</title>
+  <link rel="stylesheet" href="/static/style/optimizer.css">
+</head>
+<body>
+  <nav>
+    <div class="logo">CODEX</div>
+    <ul>
+      <li><a href="/main">Home</a></li>
+      <li><a href="/compiler">Compiler</a></li>
+      <li><a href="/debugger">Debugger</a></li>
+      <li><a href="/optimizer" class="active">Optimizer</a></li>
+      <li><a href="/practice">Practice</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="input-panel">
+      <header>
+        <h2>Optimize Your Code</h2>
+        <select id="language">
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+          <option value="java">Java</option>
+        </select>
+      </header>
+
+      <textarea id="code" placeholder="Paste code to optimize..."></textarea>
+      <div class="actions">
+        <button id="optimizeBtn" class="primary">Optimize</button>
+        <button id="copyBtn">Copy</button>
+      </div>
+    </section>
+
+    <section class="output-panel">
+      <header>
+        <h2>Optimization Insights</h2>
+        <button id="copyOutputBtn">Copy</button>
+      </header>
+      <pre id="output">Run optimization to see insights...</pre>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Optimizer</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css" integrity="sha512-RBs8V9PZ9jFm+fhP5hxwsYk/YL2KVHjjpJI6FrsP2pmzeAZ35dklKesqAhJ9psjDbQ1xD8YY1WhNpXBDmIqllg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css" integrity="sha512-sMt0SqnX+ANdUQ4Zske/ZftlHYEWBtOuzMhXddgnMZjHqjmoY/3ATTsY+uxYGbWECYuO3iy+7jwfuZQp65Tqtg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
     body {
       margin: 0;
@@ -121,40 +174,29 @@
       position: relative;
       flex: 0 0 50%; /* Always 50% width */
       display: flex;
+      flex-direction: column;
     }
     .editor-container {
       display: flex;
       position: relative;
       flex: 1;
+      border-radius: 0 0 10px 10px;
     }
 
-    /* Line numbers */
-    .line-numbers {
-      background: #2a2b32;
-      color: #9ca3af;
-      padding: 1rem 0.5rem;
-      text-align: right;
-      font-family: monospace;
-      font-size: 1rem;
-      border-radius: 10px 0 0 10px;
-      user-select: none;
-      white-space: pre;
-      line-height: 2;
-    }
-
-    /* Textarea editor */
     .editor-container textarea {
+      display: none;
+    }
+    .CodeMirror {
       flex: 1;
+      height: calc(100% - 10px);
+      font-size: 1rem;
       background: #1d1d1d;
       color: #ececf1;
-      border: none;
       border-radius: 0 10px 10px 0;
-      padding: 1rem;
-      font-family: monospace;
-      font-size: 1rem;
-      resize: none;
-      line-height: 1.4rem;
-      border-color: #000;
+    }
+    .CodeMirror-gutters {
+      background: #2a2b32;
+      border-right: none;
     }
 
     /* Copy Button */
@@ -205,6 +247,10 @@
     }
   </style>
 </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js" integrity="sha512-ULICwhf66A1VpzwuNFuIBqmoeZaZX6mE6xPD58Ll35H0TADaBrZEcD3xKhsR4HIX66vepQP9en5ZaY1f3T954Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js" integrity="sha512-qmmxBXCvA0J2i8LojRxurx8WcN6i/K3PaY6M4Za6CGbdW6f39OYc/WHYBn7eGLUdpsexLL18RVSk27jV4KW2nQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js" integrity="sha512-fdBbTK1ZBOqVakiobP6KyHR+Y6SY+4PSJVpaz6RtWLpmjHtkobaN6D+PfYZ7R6pujISiFDUFxu05oig3NbS1aA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/clike/clike.min.js" integrity="sha512-hXT/P0hs+ob8N078r+ReA8fUDjBdGdeKmIXJPVK19YWMVjA2BAynSvN+s3cHPH/x4Acbdb/sIErhwzL6GjPCbw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <body>
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
@@ -224,8 +270,17 @@
   <div class="main">
     <!-- User Code Box -->
     <div class="editor-wrapper" id="inputWrapper">
+      <div style="padding: 0.5rem; background: #202123; border-radius: 8px 8px 0 0;">
+        <label style="margin-right: 0.5rem;">Language:</label>
+        <select id="languageSelect" style="background: #1d1d1d; color: #fff; padding: 0.4rem; border: 1px solid #2a2b32; border-radius: 4px;">
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+          <option value="java">Java</option>
+        </select>
+      </div>
       <div class="editor-container">
-        <div class="line-numbers" id="lineNumbers">1</div>
         <textarea id="codeInput" placeholder="Write or paste your code here..."></textarea>
         <button class="copy-btn" id="copyInputBtn">Copy</button>
       </div>
@@ -235,7 +290,6 @@
     <!-- Optimized Code Box -->
     <div class="editor-wrapper" id="optimizedWrapper">
       <div class="editor-container">
-        <div class="line-numbers" id="lineNumbersOut">1</div>
         <textarea id="optimizedCode" readonly></textarea>
         <button class="copy-btn" id="copyOutputBtn">Copy</button>
       </div>
@@ -244,62 +298,176 @@
 
   <script>
     const textarea = document.getElementById("codeInput");
-    const lineNumbers = document.getElementById("lineNumbers");
-    const optimizedCodeBox = document.getElementById("optimizedCode");
-    const lineNumbersOut = document.getElementById("lineNumbersOut");
+    const optimizedCodeTextarea = document.getElementById("optimizedCode");
     const historyList = document.getElementById("historyList");
     const optimizedWrapper = document.getElementById("optimizedWrapper");
     const sidebar = document.getElementById("sidebar");
     const closeSidebarBtn = document.getElementById("closeSidebarBtn");
     const reopenBtn = document.getElementById("reopenBtn");
+    const languageSelect = document.getElementById("languageSelect");
 
-    // Update line numbers
-    function updateLineNumbers(textarea, lineBox) {
-      const lines = textarea.value.split("\n").length;
-      lineBox.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
+    const modeMap = {
+      python: "python",
+      javascript: "javascript",
+      cpp: "text/x-c++src",
+      c: "text/x-csrc",
+      java: "text/x-java"
+    };
+
+    const inputEditor = CodeMirror.fromTextArea(textarea, {
+      lineNumbers: true,
+      theme: "dracula",
+      mode: "python",
+      lineWrapping: true
+    });
+
+    const outputEditor = CodeMirror.fromTextArea(optimizedCodeTextarea, {
+      lineNumbers: true,
+      theme: "dracula",
+      mode: "python",
+      readOnly: true,
+      lineWrapping: true
+    });
+
+    function applyMode(lang) {
+      const normalized = (lang || "python").toLowerCase();
+      const mode = modeMap[normalized] || "python";
+      inputEditor.setOption("mode", mode);
+      outputEditor.setOption("mode", mode);
     }
 
-    textarea.addEventListener("input", () => updateLineNumbers(textarea, lineNumbers));
-    textarea.addEventListener("scroll", () => (lineNumbers.scrollTop = textarea.scrollTop));
-    optimizedCodeBox.addEventListener("scroll", () => (lineNumbersOut.scrollTop = optimizedCodeBox.scrollTop));
-    updateLineNumbers(textarea, lineNumbers);
+    const defaultLanguage = (localStorage.getItem("optimizerLanguage") || languageSelect.value || "python").toLowerCase();
+    if (modeMap[defaultLanguage]) {
+      languageSelect.value = defaultLanguage;
+    }
+    applyMode(languageSelect.value);
 
-    // Optimize mock function
-    document.getElementById("optimizeBtn").addEventListener("click", () => {
-      const code = textarea.value.trim();
+    languageSelect.addEventListener("change", () => {
+      const lang = languageSelect.value;
+      localStorage.setItem("optimizerLanguage", lang);
+      applyMode(lang);
+    });
+
+    function detectLanguage(code) {
+      if (!code) return languageSelect.value || "python";
+      if (code.includes("def ") || code.includes("print(")) return "python";
+      if (code.includes("console.log") || code.includes("function ")) return "javascript";
+      if (code.includes("#include") || code.includes("std::")) return "cpp";
+      if (code.includes("public static void main")) return "java";
+      if (code.includes("printf") || code.includes("scanf")) return "c";
+      return languageSelect.value || "python";
+    }
+
+    async function runOptimize() {
+      const rawCode = inputEditor.getValue();
+      const code = rawCode.trim();
       if (!code) {
         alert("⚠️ Please write or paste some code first.");
         return;
       }
 
-      optimizedCodeBox.value = code + 
-        "\n\n// 🚀 Optimized version:\n// - Loops simplified\n// - Variables reduced\n// - Conditions optimized";
-
       optimizedWrapper.style.display = "flex";
-      updateLineNumbers(optimizedCodeBox, lineNumbersOut);
+      outputEditor.setValue("⏳ Optimizing your code...\nPlease wait...");
+      outputEditor.refresh();
 
-      // Add entry to history
-      if (historyList.firstElementChild.textContent === "No history yet...") {
-        historyList.innerHTML = "";
+      try {
+        const selectedLang = languageSelect.value;
+        const language = (selectedLang || detectLanguage(code)).toLowerCase();
+        localStorage.setItem("optimizerLanguage", language);
+        if (modeMap[language]) {
+          languageSelect.value = language;
+          applyMode(language);
+        }
+
+        const response = await fetch("/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, language })
+        });
+
+        const result = await response.json();
+
+        let output = "// 🚀 OPTIMIZATION RESULTS\n";
+        output += "// " + "=".repeat(50) + "\n\n";
+
+        if (result.metrics && Object.keys(result.metrics).length > 0) {
+          output += "// 📊 METRICS:\n";
+          if (result.metrics.original_lines) {
+            output += `// Original lines: ${result.metrics.original_lines}\n`;
+          }
+          if (result.metrics.optimized_lines) {
+            output += `// Optimized lines: ${result.metrics.optimized_lines}\n`;
+          }
+          if (result.metrics.reduction && result.metrics.reduction > 0) {
+            output += `// Lines reduced: ${result.metrics.reduction}\n`;
+          }
+          if (result.metrics.complexity) {
+            output += `// Time Complexity: ${result.metrics.complexity}\n`;
+          }
+          output += "\n";
+        }
+
+        if (result.suggestions) {
+          output += "// 💡 SUGGESTIONS:\n";
+          result.suggestions.split("\n").forEach(line => {
+            output += `// ${line}\n`;
+          });
+          output += "\n";
+        }
+
+        output += "// " + "=".repeat(50) + "\n\n";
+        output += result.optimized_code || rawCode;
+
+        outputEditor.setValue(output);
+        outputEditor.refresh();
+
+        if (historyList.firstElementChild && historyList.firstElementChild.textContent === "No history yet...") {
+          historyList.innerHTML = "";
+        }
+        const li = document.createElement("li");
+        li.textContent = `Optimized ${language.toUpperCase()} - ` + new Date().toLocaleTimeString();
+        li.onclick = () => {
+          inputEditor.setValue(rawCode);
+          applyMode(language);
+        };
+        historyList.prepend(li);
+
+      } catch (error) {
+        outputEditor.setValue("❌ Error optimizing code:\n" + error.message);
+        outputEditor.refresh();
       }
-      const li = document.createElement("li");
-      li.textContent = "Run at " + new Date().toLocaleTimeString();
-      historyList.appendChild(li);
-    });
+    }
 
-    // Copy Input
+    document.getElementById("optimizeBtn").addEventListener("click", runOptimize);
+
+    (function preloadFromCompiler() {
+      const incoming = localStorage.getItem("optimizeCode");
+      const incomingLang = localStorage.getItem("optimizeLanguage");
+      if (incoming) {
+        inputEditor.setValue(incoming);
+        const lang = (incomingLang || detectLanguage(incoming)).toLowerCase();
+        if (modeMap[lang]) {
+          languageSelect.value = lang;
+        }
+        applyMode(languageSelect.value);
+        setTimeout(() => {
+          runOptimize();
+          localStorage.removeItem("optimizeCode");
+          localStorage.removeItem("optimizeLanguage");
+        }, 50);
+      }
+    })();
+
     document.getElementById("copyInputBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(textarea.value);
+      navigator.clipboard.writeText(inputEditor.getValue());
       alert("Copied input code!");
     });
 
-    // Copy Output
     document.getElementById("copyOutputBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(optimizedCodeBox.value);
+      navigator.clipboard.writeText(outputEditor.getValue());
       alert("Copied optimized code!");
     });
 
-    // Sidebar controls
     closeSidebarBtn.addEventListener("click", () => {
       sidebar.classList.add("hidden");
       reopenBtn.style.display = "block";

@@ -1,9 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Compiler</title>
+  <link rel="stylesheet" href="/static/style/compiler.css">
+</head>
+<body>
+  <nav>
+    <div class="logo">CODEX</div>
+    <ul>
+      <li><a href="/main">Home</a></li>
+      <li><a href="/compiler" class="active">Compiler</a></li>
+      <li><a href="/debugger">Debugger</a></li>
+      <li><a href="/optimizer">Optimizer</a></li>
+      <li><a href="/practice">Practice</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="editor-panel">
+      <header class="panel-header">
+        <div class="dropdown">
+          <label for="language">Language</label>
+          <select id="language">
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="cpp">C++</option>
+            <option value="c">C</option>
+            <option value="java">Java</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button id="runBtn" class="primary">Run</button>
+          <button id="explainBtn">Explain</button>
+          <button id="debugBtn">Debug</button>
+          <button id="optimizeBtn">Optimize</button>
+        </div>
+      </header>
+
+      <div class="editor-wrapper">
+        <textarea id="code" placeholder="Write your code here..."></textarea>
+        <button id="copyBtn" class="copy">Copy</button>
+      </div>
+
+      <footer class="secondary-actions">
+        <button id="practiceBtn">Send to Practice</button>
+        <button id="clearBtn">Clear</button>
+      </footer>
+    </section>
+
+    <aside class="history-panel">
+      <header>
+        <h2>History</h2>
+        <button id="clearHistoryBtn">Clear</button>
+      </header>
+      <ul id="historyList">
+        <li class="empty">No history yet...</li>
+      </ul>
+    </aside>
+  </main>
+
+  <section class="output" id="outputSection">
+    <header>
+      <h3 id="outputTitle">Output</h3>
+      <button id="copyOutputBtn">Copy Output</button>
+    </header>
+    <pre id="outputBox">Your output will appear here...</pre>
+  </section>
+
+  <script src="/static/js/compiler.js" defer></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CODEX — Online Compiler</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css" integrity="sha512-RBs8V9PZ9jFm+fhP5hxwsYk/YL2KVHjjpJI6FrsP2pmzeAZ35dklKesqAhJ9psjDbQ1xD8YY1WhNpXBDmIqllg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css" integrity="sha512-sMt0SqnX+ANdUQ4Zske/ZftlHYEWBtOuzMhXddgnMZjHqjmoY/3ATTsY+uxYGbWECYuO3iy+7jwfuZQp65Tqtg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
     body {
       margin: 0;
@@ -107,32 +182,10 @@
       font-size: 1rem;
     }
     textarea {
-      width: 90%;
-      flex: 1;
-      padding: 1rem;
-      font-family: monospace;
-      font-size: 1rem;
-      background: #1d1d1d;
-      color: #ececf1;
-      border: none;
-      border-radius: 0 5px 5px 0;
-      resize: none;
-      min-height: 70vh;
-      line-height: 1.5rem;
-      outline: none;
+      display: none;
     }
     .line-numbers {
-      background: #2a2b32;
-      color: #9ca3af;
-      padding: 1rem 0.5rem;
-      text-align: right;
-      font-family: monospace;
-      font-size: 1rem;
-      border-radius: 5px 0 0 5px;
-      user-select: none;
-      white-space: pre;
-      line-height: 1.5rem;
-      overflow: hidden;
+      display: none;
     }
     .editor-container {
       display: flex;
@@ -141,6 +194,18 @@
       min-height: 70vh;
       border-radius: 5px;
       overflow: hidden;
+    }
+    .CodeMirror {
+      flex: 1;
+      height: 70vh;
+      font-size: 1rem;
+      background: #1d1d1d;
+      color: #ececf1;
+      border-radius: 5px;
+    }
+    .CodeMirror-gutters {
+      background: #2a2b32;
+      border-right: none;
     }
     .btn {
       padding: 0.6rem 1.2rem;
@@ -188,6 +253,10 @@
       background: #2a2b32;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js" integrity="sha512-ULICwhf66A1VpzwuNFuIBqmoeZaZX6mE6xPD58Ll35H0TADaBrZEcD3xKhsR4HIX66vepQP9en5ZaY1f3T954Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js" integrity="sha512-qmmxBXCvA0J2i8LojRxurx8WcN6i/K3PaY6M4Za6CGbdW6f39OYc/WHYBn7eGLUdpsexLL18RVSk27jV4KW2nQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js" integrity="sha512-fdBbTK1ZBOqVakiobP6KyHR+Y6SY+4PSJVpaz6RtWLpmjHtkobaN6D+PfYZ7R6pujISiFDUFxu05oig3NbS1aA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/clike/clike.min.js" integrity="sha512-hXT/P0hs+ob8N078r+ReA8fUDjBdGdeKmIXJPVK19YWMVjA2BAynSvN+s3cHPH/x4Acbdb/sIErhwzL6GjPCbw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -215,16 +284,14 @@
 </select>
       </div>
       <div class="editor-container">
-        <div class="line-numbers" id="lineNumbers">1</div>
         <textarea id="codeEditor" placeholder="Write your code here..."></textarea>
       </div>
       <div style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
   <button id="copyCodeBtn">Copy</button>
   <button id="runBtn" class="btn btn--primary">Run Code</button>
   <button id="explainBtn" class="btn btn--outline">Explain Code</button>
-
-  <button id="debugBtn" class="btn btn--outline" onclick="window.location.href='/debug'">🪲 Debug</button>
-  <button id="optimizeBtn" class="btn btn--outline" onclick="window.location.href='/optimizer'">⚙️ Optimize</button>
+  <button id="debugBtn" class="btn btn--outline">🪲 Debug</button>
+  <button id="optimizeBtn" class="btn btn--outline">⚙️ Optimize</button>
   <button id="practiceBtn" class="btn btn--outline" onclick="window.location.href='/practice'">🏋️ Practice</button>
 </div>
 

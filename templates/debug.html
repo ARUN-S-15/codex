@@ -3,8 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Debugger</title>
+  <link rel="stylesheet" href="/static/style/debug.css">
+</head>
+<body>
+  <nav>
+    <div class="logo">CODEX</div>
+    <ul>
+      <li><a href="/main">Home</a></li>
+      <li><a href="/compiler">Compiler</a></li>
+      <li><a href="/debugger" class="active">Debugger</a></li>
+      <li><a href="/optimizer">Optimizer</a></li>
+      <li><a href="/practice">Practice</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="input-panel">
+      <header>
+        <h2>Debug Your Code</h2>
+        <select id="language">
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+          <option value="java">Java</option>
+        </select>
+      </header>
+
+      <textarea id="code" placeholder="Paste code to debug..."></textarea>
+      <div class="actions">
+        <button id="analyzeBtn" class="primary">Analyze</button>
+        <button id="explainBtn">Explain</button>
+        <button id="copyBtn">Copy</button>
+      </div>
+    </section>
+
+    <section class="output-panel">
+      <header>
+        <h2>Diagnostics</h2>
+        <button id="copyOutputBtn">Copy</button>
+      </header>
+      <pre id="output">Submit code to see diagnostics...</pre>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CODEX - Debug Code</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css" integrity="sha512-RBs8V9PZ9jFm+fhP5hxwsYk/YL2KVHjjpJI6FrsP2pmzeAZ35dklKesqAhJ9psjDbQ1xD8YY1WhNpXBDmIqllg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css" integrity="sha512-sMt0SqnX+ANdUQ4Zske/ZftlHYEWBtOuzMhXddgnMZjHqjmoY/3ATTsY+uxYGbWECYuO3iy+7jwfuZQp65Tqtg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
     body {
       margin: 0;
@@ -44,39 +99,13 @@
       color: #10a37f;
     }
 
-    /* Layout */
     .main-container {
       display: flex;
       height: calc(100vh - 70px);
     }
 
-    /* History Box */
-    .history {
-      width: 20%;
-      background: #111;
-      border-right: 1px solid #2a2b32;
-      padding: 1rem;
-      overflow-y: auto;
-    }
-
-    .history h2 {
-      font-size: 1rem;
-      margin-bottom: 1rem;
-      color: #10a37f;
-    }
-
-    .history p {
-      font-size: 0.9rem;
-      background: #1e1e1e;
-      padding: 0.5rem;
-      border-radius: 6px;
-      margin-bottom: 0.5rem;
-      cursor: pointer;
-    }
-
-    /* Editor */
     .editor-section {
-      width: 40%;
+      width: 50%;
       padding: 1rem;
       display: flex;
       flex-direction: column;
@@ -88,32 +117,23 @@
       display: flex;
     }
 
-   /* Line numbers */
-   .line-numbers {
-      background: #2a2b32;
-      color: #9ca3af;
-      padding: 1rem 0.5rem;
-      text-align: right;
-      font-family: monospace;
-      font-size: 1rem;
-      border-radius: 10px 0 0 10px;
-      user-select: none;
-      white-space: pre;
-      line-height: 2;
+    .editor-wrapper textarea,
+    .result-box textarea {
+      display: none;
     }
 
-    textarea {
+    .CodeMirror {
       flex: 1;
+      height: 100%;
+      font-size: 1rem;
       background: #1d1d1d;
       color: #ececf1;
-      border: none;
-      border-radius: 0 10px 10px 0;
-      padding: 1rem;
-      font-family: monospace;
-      font-size: 1rem;
-      resize: none;
-      outline: none;
-      line-height: 2;
+      border-radius: 10px;
+    }
+
+    .CodeMirror-gutters {
+      background: #2a2b32;
+      border-right: none;
     }
 
     .copy-btn {
@@ -148,11 +168,10 @@
       background: #0d8b6d;
     }
 
-    /* Results side */
     .results {
-      width: 40%;
+      width: 50%;
       padding: 1rem;
-      display: none;
+      display: flex;
       flex-direction: column;
       gap: 1rem;
       animation: fadeIn 0.5s ease-in-out;
@@ -191,119 +210,146 @@
       color: #aaa;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js" integrity="sha512-ULICwhf66A1VpzwuNFuIBqmoeZaZX6mE6xPD58Ll35H0TADaBrZEcD3xKhsR4HIX66vepQP9en5ZaY1f3T954Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js" integrity="sha512-qmmxBXCvA0J2i8LojRxurx8WcN6i/K3PaY6M4Za6CGbdW6f39OYc/WHYBn7eGLUdpsexLL18RVSk27jV4KW2nQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js" integrity="sha512-fdBbTK1ZBOqVakiobP6KyHR+Y6SY+4PSJVpaz6RtWLpmjHtkobaN6D+PfYZ7R6pujISiFDUFxu05oig3NbS1aA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/clike/clike.min.js" integrity="sha512-hXT/P0hs+ob8N078r+ReA8fUDjBdGdeKmIXJPVK19YWMVjA2BAynSvN+s3cHPH/x4Acbdb/sIErhwzL6GjPCbw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
   <!-- NAVBAR -->
   <nav>
     <div class="logo">⚡ CODEX ⚡</div>
     <ul>
-      <li><a href="{{ url_for('main') }}">History</a></li>
-      <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
+      <li><a href="/main">History</a></li>
+      <li><a href="/compiler">Compiler</a></li>
       <li><a href="#">About</a></li>
       <li><a href="#">Contact</a></li>
-      <li><a href="{{ url_for('login') }}">Login</a></li>
-      <li><a href="{{ url_for('login') }}">Logout</a></li>
+      <li><a href="/login">Login</a></li>
+      <li><a href="/logout">Logout</a></li>
     </ul>
   </nav>
 
   <!-- MAIN LAYOUT -->
   <div class="main-container">
-    <!-- History Box -->
-    <aside class="history" id="historyBox">
-      <h2>History</h2>
-      <p>Previous debug 1</p>
-      <p>Previous debug 2</p>
-    </aside>
-
     <!-- Editor Section -->
     <div class="editor-section">
       <div class="editor-wrapper">
-        <div class="line-numbers" id="lineNumbers">1</div>
-        <textarea id="codeInput" placeholder="Paste your code here..."></textarea>
+        <textarea id="codeInput" placeholder="Your code will appear here..."></textarea>
         <button class="copy-btn" id="copyInputBtn">Copy</button>
       </div>
-      <button id="debugBtn">🐞 Debug My Code</button>
     </div>
 
     <!-- Results Section -->
     <div class="results" id="results">
+      <h2>Debug Output</h2>
       <div class="result-box">
         <pre id="issues">No code analyzed yet.</pre>
         <button class="copy-btn" id="copyIssuesBtn">Copy</button>
       </div>
       <div class="result-box">
-        <pre id="fixedCode">No code analyzed yet.</pre>
+        <textarea id="fixedCode" readonly>No code analyzed yet.</textarea>
         <button class="copy-btn" id="copyFixedBtn">Copy</button>
       </div>
+      
     </div>
   </div>
 
-  <!-- FOOTER -->
   <footer>
     <p>© 2025 CODEX. All rights reserved.</p>
   </footer>
 
   <script>
-  const codeInput = document.getElementById("codeInput");
-  const lineNumbers = document.getElementById("lineNumbers");
-  const debugBtn = document.getElementById("debugBtn");
-  const issuesBox = document.getElementById("issues");
-  const fixedCodeBox = document.getElementById("fixedCode");
-  const results = document.getElementById("results");
-  const historyBox = document.getElementById("historyBox");
+    document.addEventListener("DOMContentLoaded", async () => {
+      const codeTextarea = document.getElementById("codeInput");
+      const fixedTextarea = document.getElementById("fixedCode");
+      const issuesBox = document.getElementById("issues");
+      const results = document.getElementById("results");
+      const copyInputBtn = document.getElementById("copyInputBtn");
+      const copyIssuesBtn = document.getElementById("copyIssuesBtn");
+      const copyFixedBtn = document.getElementById("copyFixedBtn");
 
-  // Line numbers update
-  codeInput.addEventListener("input", () => {
-    const lines = codeInput.value.split("\n").length;
-    lineNumbers.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
-  });
+      const modeMap = {
+        python: "python",
+        javascript: "javascript",
+        java: "text/x-java",
+        c: "text/x-csrc",
+        cpp: "text/x-c++src"
+      };
 
-  // Debug via Flask backend
-  debugBtn.addEventListener("click", async () => {
-    const code = codeInput.value.trim();
-    if (!code) {
-      issuesBox.textContent = "⚠️ Please paste some code first.";
-      fixedCodeBox.textContent = "";
-      results.style.display = "flex";
-      historyBox.style.display = "none";
-      return;
-    }
-
-    issuesBox.textContent = "🐞 Debugging your code...";
-    fixedCodeBox.textContent = "";
-
-    try {
-      const response = await fetch("/debug", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code })
+      const inputEditor = CodeMirror.fromTextArea(codeTextarea, {
+        lineNumbers: true,
+        theme: "dracula",
+        mode: "python",
+        lineWrapping: true
       });
 
-      const data = await response.json();
-      issuesBox.textContent = data.issues || "No issues found ✅";
-      fixedCodeBox.textContent = data.fixed_code || code;
+      const fixedEditor = CodeMirror.fromTextArea(fixedTextarea, {
+        lineNumbers: true,
+        theme: "dracula",
+        mode: "python",
+        readOnly: true,
+        lineWrapping: true
+      });
 
-      results.style.display = "flex";   // show results
-      historyBox.style.display = "none"; // hide history
-    } catch (err) {
-      issuesBox.textContent = "❌ Error: " + err.message;
-      fixedCodeBox.textContent = "";
-    }
-  });
+      const code = localStorage.getItem("debugCode") || "";
+      const language = (localStorage.getItem("debugLanguage") || "python").toLowerCase();
 
-  // Copy Buttons
-  document.getElementById("copyInputBtn").addEventListener("click", () => {
-    navigator.clipboard.writeText(codeInput.value);
-  });
+      inputEditor.setValue(code);
+      inputEditor.refresh();
 
-  document.getElementById("copyIssuesBtn").addEventListener("click", () => {
-    navigator.clipboard.writeText(issuesBox.textContent);
-  });
+      const applyMode = (lang) => {
+        const normalized = (lang || "python").toLowerCase();
+        const mode = modeMap[normalized] || "python";
+        inputEditor.setOption("mode", mode);
+        fixedEditor.setOption("mode", mode);
+      };
 
-  document.getElementById("copyFixedBtn").addEventListener("click", () => {
-    navigator.clipboard.writeText(fixedCodeBox.textContent);
-  });
-</script>
+      applyMode(language);
 
+      if (!code.trim()) {
+        issuesBox.textContent = "⚠️ No code provided for debugging.";
+        return;
+      }
+
+      issuesBox.textContent = "🪲 Debugging your code...";
+      results.style.display = "flex";
+
+      try {
+        const response = await fetch("/debug", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, language })
+        });
+
+        const data = await response.json();
+
+        if (data.debug && data.debug.trim() !== "✅ No issues found!") {
+          issuesBox.textContent = data.debug;
+        } else {
+          issuesBox.textContent = "✅ No issues found!\n\nYour code passed syntax, lint, type, and security checks (Python compiler, Pyflakes, Pylint, Mypy, Bandit, ESLint, compilers, etc.).";
+        }
+
+        const fixed = data.fixed_code || code;
+        fixedEditor.setValue(fixed);
+        fixedEditor.refresh();
+      } catch (err) {
+        issuesBox.textContent = "❌ Error: " + err.message;
+        fixedEditor.setValue(code);
+        fixedEditor.refresh();
+      }
+
+      copyInputBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(inputEditor.getValue());
+      });
+
+      copyIssuesBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(issuesBox.textContent);
+      });
+
+      copyFixedBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(fixedEditor.getValue());
+      });
+    });
+  </script>
 </body>
 </html>
