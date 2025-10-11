@@ -132,7 +132,10 @@
       outline: none;
       tab-size: 4;
       caret-color: #ececf1;
-      -webkit-text-fill-color: white;
+      -webkit-text-fill-color: transparent;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      letter-spacing: normal;
     }
     .line-numbers {
       background: #2a2b32;
@@ -184,13 +187,18 @@
       border: none;
       tab-size: 4;
       z-index: 0;
+      letter-spacing: normal;
     }
     
     .syntax-highlight code {
       font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+      font-size: 1.3rem !important;
+      line-height: 1.95rem !important;
       background: transparent !important;
       padding: 0 !important;
       margin: 0 !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
     }
     
     #codeEditor {
@@ -260,11 +268,16 @@
       background: #2a2b32 !important;
       color: #ececf1 !important;
       border: 1px solid #565869 !important;
+      -webkit-text-fill-color: #ececf1 !important;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+      font-size: 1.1rem !important;
+      line-height: 1.5 !important;
     }
     
     #inputBox::placeholder {
       color: #888 !important;
       opacity: 1 !important;
+      -webkit-text-fill-color: #888 !important;
     }
   </style>
 </head>
@@ -307,8 +320,8 @@
           📝 Input (for programs that need user input like input(), scanf(), Scanner, etc.):
         </label>
         <textarea id="inputBox" 
-                  placeholder="Enter input here (one value per line)&#10;Example:&#10;John&#10;25" 
-                  style="width:100%;min-height:80px;padding:0.5rem;background:#2a2b32;color:#ececf1;border:1px solid #565869;border-radius:4px;font-family:monospace;font-size:1rem;resize:vertical;"></textarea>
+                  placeholder="Enter input here (one value per line)&#10;" 
+                  style="width:100%;min-height:80px;padding:0.5rem;background:#2a2b32;color:#3b3bd0;border:1px solid #565869;border-radius:4px;font-family:monospace;font-size:1rem;resize:vertical;"></textarea>
       </div>
       
       <div style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">

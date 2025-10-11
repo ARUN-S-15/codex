@@ -233,6 +233,115 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // ---- AUTO-COMPLETION FOR BRACKETS, QUOTES ----
+  if (codeEditor) {
+    codeEditor.addEventListener('keydown', (e) => {
+      const start = codeEditor.selectionStart;
+      const end = codeEditor.selectionEnd;
+      const value = codeEditor.value;
+      
+      // Auto-close brackets, quotes, etc.
+      const pairs = {
+        '(': ')',
+        '[': ']',
+        '{': '}',
+        '"': '"',
+        "'": "'",
+        '`': '`'
+      };
+      
+      if (pairs[e.key]) {
+        e.preventDefault();
+        const closingChar = pairs[e.key];
+        
+        // Insert opening and closing characters
+        const newValue = value.substring(0, start) + e.key + closingChar + value.substring(end);
+        codeEditor.value = newValue;
+        
+        // Move cursor between the pair
+        codeEditor.selectionStart = codeEditor.selectionEnd = start + 1;
+        
+        // Update UI
+        updateLineNumbers();
+        updateSyntaxHighlight();
+        return;
+      }
+      
+      // Handle Enter key for auto-indentation
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        const lines = value.substring(0, start).split('\n');
+        const currentLine = lines[lines.length - 1];
+        
+        // Calculate current indentation
+        const indent = currentLine.match(/^\s*/)[0];
+        
+        // Check if current line ends with characters that require extra indent
+        const trimmedLine = currentLine.trim();
+        const needsExtraIndent = /[\(\[\{:]$/.test(trimmedLine);
+        
+        // Determine new indentation
+        let newIndent = indent;
+        if (needsExtraIndent) {
+          newIndent = indent + '    '; // Add 4 spaces (1 tab)
+        }
+        
+        // Insert newline with indentation
+        const newValue = value.substring(0, start) + '\n' + newIndent + value.substring(end);
+        codeEditor.value = newValue;
+        
+        // Move cursor to end of indentation
+        codeEditor.selectionStart = codeEditor.selectionEnd = start + 1 + newIndent.length;
+        
+        // Update UI
+        updateLineNumbers();
+        updateSyntaxHighlight();
+        return;
+      }
+      
+      // Handle Tab key for indentation
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        
+        // Insert 4 spaces
+        const newValue = value.substring(0, start) + '    ' + value.substring(end);
+        codeEditor.value = newValue;
+        
+        // Move cursor after the tab
+        codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
+        
+        // Update UI
+        updateLineNumbers();
+        updateSyntaxHighlight();
+        return;
+      }
+      
+      // Handle Backspace to delete matching closing bracket/quote
+      if (e.key === 'Backspace') {
+        const charBefore = value.charAt(start - 1);
+        const charAfter = value.charAt(start);
+        
+        // Check if we're deleting an opening bracket/quote with matching closing one
+        if (pairs[charBefore] && pairs[charBefore] === charAfter && start === end) {
+          e.preventDefault();
+          
+          // Delete both characters
+          const newValue = value.substring(0, start - 1) + value.substring(start + 1);
+          codeEditor.value = newValue;
+          
+          // Move cursor back
+          codeEditor.selectionStart = codeEditor.selectionEnd = start - 1;
+          
+          // Update UI
+          updateLineNumbers();
+          updateSyntaxHighlight();
+          return;
+        }
+      }
+    });
+  }
+
   // Update on input and language change
   if (codeEditor) {
     codeEditor.addEventListener('input', () => {
