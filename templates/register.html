@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEX - Register</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ececf1;
+    }
+
+    .register-container {
+      background: rgba(32, 33, 35, 0.95);
+      border-radius: 20px;
+      padding: 3rem;
+      width: 450px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(16, 163, 127, 0.3);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .logo h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #10a37f 0%, #6ad7ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .logo p {
+      color: #b4b4b4;
+      font-size: 0.95rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #ececf1;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.9rem 1.2rem;
+      background: #2a2b32;
+      border: 2px solid #565869;
+      border-radius: 10px;
+      color: #ececf1;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #10a37f;
+      box-shadow: 0 0 15px rgba(16, 163, 127, 0.3);
+    }
+
+    .form-group input::placeholder {
+      color: #888;
+    }
+
+    .error-message {
+      background: linear-gradient(135deg, rgba(255, 84, 89, 0.2) 0%, rgba(255, 84, 89, 0.1) 100%);
+      color: #ff5459;
+      padding: 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #ff5459;
+      font-size: 0.9rem;
+    }
+
+    .success-message {
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.2) 0%, rgba(16, 163, 127, 0.1) 100%);
+      color: #10a37f;
+      padding: 1rem;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid #10a37f;
+      font-size: 0.9rem;
+    }
+
+    .btn-register {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, #10a37f 0%, #0d8b6d 100%);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(16, 163, 127, 0.4);
+    }
+
+    .btn-register:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 163, 127, 0.6);
+    }
+
+    .login-link {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #b4b4b4;
+      font-size: 0.95rem;
+    }
+
+    .login-link a {
+      color: #10a37f;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.3s ease;
+    }
+
+    .login-link a:hover {
+      color: #6ad7ff;
+    }
+
+    .password-strength {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .strength-bar {
+      height: 4px;
+      background: #2a2b32;
+      border-radius: 2px;
+      margin-top: 0.3rem;
+      overflow: hidden;
+    }
+
+    .strength-fill {
+      height: 100%;
+      width: 0%;
+      transition: all 0.3s ease;
+    }
+
+    .strength-weak { background: #ff5459; width: 33%; }
+    .strength-medium { background: #ffc107; width: 66%; }
+    .strength-strong { background: #10a37f; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="register-container">
+    <div class="logo">
+      <h1>⚡ CODEX</h1>
+      <p>Create your account</p>
+    </div>
+
+    {% if error %}
+    <div class="error-message">
+      ❌ {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('register') }}" id="registerForm">
+      <div class="form-group">
+        <label for="username">👤 Username</label>
+        <input type="text" id="username" name="username" placeholder="Choose a username" required>
+      </div>
+
+      <div class="form-group">
+        <label for="email">📧 Email</label>
+        <input type="email" id="email" name="email" placeholder="your@email.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">🔒 Password</label>
+        <input type="password" id="password" name="password" placeholder="Create a strong password" required>
+        <div class="password-strength">
+          <div class="strength-bar">
+            <div class="strength-fill" id="strengthFill"></div>
+          </div>
+          <span id="strengthText" style="color: #888; font-size: 0.85rem;"></span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="confirm_password">🔒 Confirm Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
+      </div>
+
+      <button type="submit" class="btn-register">🚀 Create Account</button>
+    </form>
+
+    <div class="login-link">
+      Already have an account? <a href="{{ url_for('login') }}">Login here</a>
+    </div>
+  </div>
+
+  <script>
+    // Password strength checker
+    const passwordInput = document.getElementById('password');
+    const strengthFill = document.getElementById('strengthFill');
+    const strengthText = document.getElementById('strengthText');
+
+    passwordInput.addEventListener('input', () => {
+      const password = passwordInput.value;
+      let strength = 0;
+
+      if (password.length >= 6) strength++;
+      if (password.length >= 10) strength++;
+      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+      if (/\d/.test(password)) strength++;
+      if (/[@$!%*?&#]/.test(password)) strength++;
+
+      strengthFill.className = 'strength-fill';
+      if (strength <= 2) {
+        strengthFill.classList.add('strength-weak');
+        strengthText.textContent = 'Weak password';
+        strengthText.style.color = '#ff5459';
+      } else if (strength <= 3) {
+        strengthFill.classList.add('strength-medium');
+        strengthText.textContent = 'Medium strength';
+        strengthText.style.color = '#ffc107';
+      } else {
+        strengthFill.classList.add('strength-strong');
+        strengthText.textContent = 'Strong password!';
+        strengthText.style.color = '#10a37f';
+      }
+    });
+
+    // Password match validation
+    const confirmPassword = document.getElementById('confirm_password');
+    const form = document.getElementById('registerForm');
+
+    form.addEventListener('submit', (e) => {
+      if (passwordInput.value !== confirmPassword.value) {
+        e.preventDefault();
+        alert('❌ Passwords do not match!');
+        confirmPassword.focus();
+      }
+    });
+  </script>
+</body>
+</html>

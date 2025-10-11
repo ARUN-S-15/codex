@@ -15,6 +15,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
   
   <style>
+    .explanation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin: 1rem 0;
+    }
+    @media (max-width: 900px) {
+      .explanation-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -218,23 +229,59 @@
       background: rgba(16, 163, 127, 0.3);
     }
     .btn {
-      padding: 0.6rem 1.2rem;
-      border-radius: 6px;
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
       border: none;
       cursor: pointer;
-      margin-right: 0.5rem;
+      margin-right: 0.6rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+    .btn:hover::before {
+      width: 300px;
+      height: 300px;
     }
     .btn--primary {
-      background: #10a37f;
+      background: linear-gradient(135deg, #10a37f 0%, #0d8b6d 100%);
       color: #fff;
+      box-shadow: 0 4px 15px rgba(16, 163, 127, 0.4);
+    }
+    .btn--primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 163, 127, 0.6);
     }
     .btn--outline {
-      background: transparent;
-      border: 1px solid #565869;
+      background: linear-gradient(135deg, rgba(86, 88, 105, 0.2) 0%, rgba(42, 43, 50, 0.4) 100%);
+      border: 2px solid #565869;
       color: #ececf1;
+      position: relative;
     }
     .btn--outline:hover {
-      background: #2a2b32;
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.15) 0%, rgba(106, 215, 255, 0.15) 100%);
+      border-color: #10a37f;
+      color: #10a37f;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(16, 163, 127, 0.3);
+    }
+    #practiceBtn:hover {
+      border-color: #6ad7ff;
+      color: #6ad7ff;
+      background: linear-gradient(135deg, rgba(106, 215, 255, 0.15) 0%, rgba(162, 89, 255, 0.15) 100%);
     }
     .hidden {
       display: none !important;
@@ -248,6 +295,71 @@
       word-wrap: break-word;
       margin-top: 1rem;
       flex: 1;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    
+    /* ChatGPT-style explanation cards */
+    .explanation-card {
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.1) 0%, rgba(16, 163, 127, 0.05) 100%);
+      border-left: 4px solid #10a37f;
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+    
+    .explanation-title {
+      color: #10a37f;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .explanation-content {
+      color: #ececf1;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .explanation-code {
+      background: #0d0d0d;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 0.7rem;
+      margin: 0.7rem 0;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.85rem;
+      color: #6ad7ff;
+      overflow-x: auto;
+    }
+    
+    .explanation-section-header {
+      color: #ffc107;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 1.5rem 0 1rem 0;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #ffc107;
+    }
+    
+    .suggestion-item {
+      background: rgba(255, 193, 7, 0.1);
+      border-left: 4px solid #ffc107;
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+      margin-bottom: 0.8rem;
+      color: #ececf1;
+      line-height: 1.6;
+    }
+    
+    .suggestion-item strong {
+      color: #ffc107;
     }
     #copyCodeBtn {
       background-color: transparent;
@@ -298,13 +410,16 @@
     <div class="section">
       <div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
         <h2>Code Editor</h2>
-       <select id="languageSelect">
-  <option value="71">Python</option>
-  <option value="50">C </option>
-  <option value="54">C++</option>
-  <option value="63">JavaScript (Node.js 12.14.0)</option>
-  <option value="62">Java (OpenJDK 13.0.1)</option>
-</select>
+        <div style="display:flex;gap:1rem;align-items:center;">
+          <select id="languageSelect">
+            <option value="71">Python</option>
+            <option value="50">C </option>
+            <option value="54">C++</option>
+            <option value="63">JavaScript (Node.js 12.14.0)</option>
+            <option value="62">Java (OpenJDK 13.0.1)</option>
+          </select>
+          <button id="copyCodeBtn" class="btn btn--outline" style="padding:0.6rem 1rem;margin:0;">📋 Copy</button>
+        </div>
       </div>
       <div class="editor-container">
         <div class="line-numbers" id="lineNumbers">1</div>
@@ -324,14 +439,12 @@
                   style="width:100%;min-height:80px;padding:0.5rem;background:#2a2b32;color:#3b3bd0;border:1px solid #565869;border-radius:4px;font-family:monospace;font-size:1rem;resize:vertical;"></textarea>
       </div>
       
-      <div style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
-  <button id="copyCodeBtn">Copy</button>
+      <div style="margin-top:1.5rem; display:flex; flex-wrap:wrap; gap:0.8rem; align-items:center;">
   <button id="runBtn" class="btn btn--primary">▶ Run Code</button>
   <button id="explainBtn" class="btn btn--outline">💡 Explain Code</button>
-
   <button id="debugBtn" class="btn btn--outline">🪲 Debug</button>
-  <button id="optimizeBtn" class="btn btn--outline" onclick="window.location.href='/optimizer'">⚙️ Optimize</button>
-  <button id="practiceBtn" class="btn btn--outline" onclick="window.location.href='/practice'">🏋️ Practice</button>
+  <button id="optimizeBtn" class="btn btn--outline">⚙️ Optimize</button>
+  <button id="practiceBtn" class="btn btn--outline" onclick="window.location.href='/problem'">🎯 Practice</button>
 </div>
 
     </div>
@@ -348,6 +461,6 @@
   </main>
 
   <!-- ✅ Better: move JS into a separate file -->
-  <script src="{{ url_for('static', filename='js/compiler.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/compiler.js') }}?v=5"></script>
 </body>
 </html>

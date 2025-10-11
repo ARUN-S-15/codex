@@ -17,7 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---- RUN CODE ----
   if (runBtn && resultSection && resultBox) {
+    console.log("Run button listener attached successfully");
     runBtn.addEventListener("click", async () => {
+      console.log("Run button clicked!");
       const code = codeEditor.value.trim();
       const language_id = parseInt(languageSelect.value);
       const inputBox = document.getElementById("inputBox");
@@ -48,6 +50,113 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---- EXPLAIN CODE ----
+  // Format explanation in ChatGPT style
+  function formatExplanation(text) {
+    let html = '';
+    const lines = text.split('\n');
+    let inSection = false;
+    let sectionContent = '';
+    let sectionTitle = '';
+
+    for (let line of lines) {
+      // Section headers
+      if (line.match(/^(Language:|Lines:|Imports|Classes|Functions|Top-level observations:|Quick recommendations:|Python hints:)/i)) {
+        if (inSection && sectionContent) {
+          html += createExplanationCard(sectionTitle, sectionContent);
+          sectionContent = '';
+        }
+        sectionTitle = line;
+        inSection = true;
+      } else if (inSection) {
+        sectionContent += line + '\n';
+      } else {
+        if (line.trim()) {
+          html += `<div style="margin-bottom: 0.5rem; color: #ececf1;">${escapeHtml(line)}</div>`;
+        }
+      }
+    }
+
+    if (inSection && sectionContent) {
+      html += createExplanationCard(sectionTitle, sectionContent);
+    }
+
+    // Wrap all cards in a grid container for more color and spacing
+    return `<div class="explanation-grid">${html}</div>` || `<div style="padding: 1rem; color: #888;">${escapeHtml(text)}</div>`;
+  }
+
+  function createExplanationCard(title, content) {
+    const iconMap = {
+      'language': '🔤',
+      'lines': '📝',
+      'imports': '📦',
+      'classes': '🏛️',
+      'functions': '⚡',
+      'observations': '🔍',
+      'recommendations': '💡',
+      'hints': '🎯'
+    };
+
+    const colorMap = {
+      'language': '#6ad7ff',
+      'lines': '#ffc107',
+      'imports': '#a259ff',
+      'classes': '#ff5459',
+      'functions': '#10a37f',
+      'observations': '#ffb86c',
+      'recommendations': '#00c896',
+      'hints': '#ffb300'
+    };
+
+    const emojiMap = {
+      'language': '🌐',
+      'lines': '📏',
+      'imports': '📦',
+      'classes': '🏛️',
+      'functions': '🛠️',
+      'observations': '👀',
+      'recommendations': '✨',
+      'hints': '🧠'
+    };
+
+    const lowerTitle = title.toLowerCase();
+    let icon = '📌';
+    let color = '#10a37f';
+    let emoji = '💬';
+    for (let key of Object.keys(iconMap)) {
+      if (lowerTitle.includes(key)) {
+        icon = iconMap[key];
+        color = colorMap[key];
+        emoji = emojiMap[key];
+        break;
+      }
+    }
+
+    let html = `<div class="explanation-card" style="background: linear-gradient(135deg, ${color}22 0%, #222 100%); border-left: 6px solid ${color}; box-shadow: 0 2px 8px ${color}33; margin: 1rem; padding: 1.2rem 1.5rem; border-radius: 12px; display: flex; flex-direction: column; gap: 0.5rem;">`;
+    html += `<div class="explanation-title" style="font-size: 1.1rem; font-weight: 600; color: ${color}; margin-bottom: 0.5rem;">${emoji} ${escapeHtml(title)}</div>`;
+    html += '<div class="explanation-content" style="color: #ececf1;">';
+
+    const contentLines = content.split('\n').filter(l => l.trim());
+    for (let line of contentLines) {
+      line = line.trim();
+      if (line.startsWith('-')) {
+        html += `<div style="margin-left: 1rem; margin-bottom: 0.3rem;">🌈 ${escapeHtml(line.substring(1).trim())}</div>`;
+      } else if (line.match(/^(def |function |class |import |#include)/)) {
+        html += `<div class="explanation-code" style="background: #181818; color: #6ad7ff; border-radius: 6px; padding: 0.3rem 0.7rem; margin: 0.3rem 0; font-family: 'Consolas', monospace; font-size: 0.95rem;">${escapeHtml(line)}</div>`;
+      } else if (line) {
+        html += `<div style="margin-bottom: 0.5rem;">${escapeHtml(line)}</div>`;
+      }
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
   // Client-side explanation generator (lightweight heuristics)
   function generateExplanation(code, languageText) {
     const lines = code.split(/\r?\n/).map(l => l.replace(/\t/g, '    '));
@@ -112,7 +221,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (explainBtn && explanationSection && explanationBox) {
+    console.log("Explain button listener attached successfully");
     explainBtn.addEventListener("click", async () => {
+      console.log("Explain button clicked!");
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || languageSelect.value;
       const languageValue = (languageText || "").toLowerCase();
@@ -120,11 +231,11 @@ document.addEventListener("DOMContentLoaded", () => {
       explanationSection.classList.remove("hidden");
 
       if (!code) {
-        explanationBox.textContent = "⚠️ Please write some code to explain!";
+        explanationBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ Please write some code to explain!</div>';
         return;
       }
 
-      explanationBox.textContent = "💡 Contacting server for linted explanation...";
+      explanationBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">💡 Analyzing your code...<br>⏳ Please wait...</div>';
 
       try {
         const resp = await fetch("/explain", {
@@ -138,19 +249,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // If server reports that linter is missing, fall back to local generator
         if (data.explanation && /Linter tool not found|No linter configured/.test(data.explanation)) {
-          explanationBox.textContent = generateExplanation(code, languageText) + "\n\n" + data.explanation;
+          const localExplanation = generateExplanation(code, languageText);
+          explanationBox.innerHTML = formatExplanation(localExplanation) + 
+            '<div class="explanation-card" style="border-left-color: #ffc107;"><div class="explanation-title">⚠️ Note</div><div class="explanation-content">' + 
+            escapeHtml(data.explanation) + '</div></div>';
           return;
         }
 
         // Prefer server-provided explanation (structured + linter output)
         if (data.explanation) {
-          explanationBox.textContent = data.explanation;
+          explanationBox.innerHTML = formatExplanation(data.explanation);
         } else {
-          explanationBox.textContent = generateExplanation(code, languageText);
+          const localExplanation = generateExplanation(code, languageText);
+          explanationBox.innerHTML = formatExplanation(localExplanation);
         }
       } catch (err) {
         // Fallback: use local generator
-        explanationBox.textContent = "⚠️ Server unavailable, using local explanation.\n\n" + generateExplanation(code, languageText);
+        const localExplanation = generateExplanation(code, languageText);
+        explanationBox.innerHTML = '<div class="explanation-card" style="border-left-color: #ff5459;"><div class="explanation-title">⚠️ Server Unavailable</div><div class="explanation-content">Using local explanation generator.</div></div>' + 
+          formatExplanation(localExplanation);
       }
     });
   }
@@ -173,6 +290,28 @@ document.addEventListener("DOMContentLoaded", () => {
       
       // Navigate to debug page
       window.location.href = "/debugger";
+    });
+  }
+
+  // ---- OPTIMIZE CODE ----
+  // Send code to optimizer page via localStorage
+  const optimizeBtn = document.getElementById("optimizeBtn");
+  if (optimizeBtn) {
+    optimizeBtn.addEventListener("click", () => {
+      const code = codeEditor.value.trim();
+      const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
+      
+      if (!code) {
+        alert("⚠️ Please write some code before optimizing!");
+        return;
+      }
+
+      // Store code and language in localStorage
+      localStorage.setItem("optimizeCode", code);
+      localStorage.setItem("optimizeLanguage", languageText);
+      
+      // Navigate to optimizer page
+      window.location.href = "/optimizer";
     });
   }
 

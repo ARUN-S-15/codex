@@ -15,7 +15,12 @@
     <!-- Login Form -->
     <div class="form-box Login">
       <h2 class="animation" style="--D:0; --S:21">Login</h2>
-      <form method="POST" action="/">
+      {% if error %}
+      <div class="error-msg animation" style="--D:1; --S:22; color: #ff5459; background: rgba(255,84,89,0.1); padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;">
+        ❌ {{ error }}
+      </div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('login') }}">
         <div class="input-box animation" style="--D:1; --S:22">
           <input type="text" name="username" required>
           <label>Username</label>
@@ -33,7 +38,7 @@
         </div>
 
         <div class="regi-link animation" style="--D:4; --S:25">
-          <p>Don't have an account? <br> <a href="#" class="SignUpLink">Sign Up</a></p>
+          <p>Don't have an account? <br> <a href="{{ url_for('register') }}" class="SignUpLink">Sign Up</a></p>
         </div>
       </form>
     </div>

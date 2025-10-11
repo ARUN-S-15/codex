@@ -1,26 +1,107 @@
 # app.py
 import os
-from flask import Flask, request, jsonify, render_template, redirect, url_for, make_response, Response
+from flask import Flask, request, jsonify, render_template, redirect, url_for, make_response, Response, session, flash
 import sys, ast, traceback, re, requests, subprocess, tempfile
+import sqlite3
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this-in-production'  # Required for sessions and flash messages
 
-# ---------------- LOGIN ----------------
+# Database initialization
+def init_db():
+    conn = sqlite3.connect('codex.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Initialize database on startup
+init_db()
+
+# ---------------- AUTHENTICATION ----------------
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-        if username == "admin" and password == "123":
-            resp = make_response(redirect(url_for("main")))
-            resp.set_cookie("user", username)
-            return resp
+        
+        # Check credentials in database
+        conn = sqlite3.connect('codex.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, username, password FROM users WHERE username = ?', (username,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user and check_password_hash(user[2], password):
+            # Login successful
+            session['user_id'] = user[0]
+            session['username'] = user[1]
+            return redirect(url_for("main"))
         else:
-            return render_template("login.html", error="Invalid credentials")
+            return render_template("login.html", error="Invalid username or password!")
+    
     return render_template("login.html")
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        
+        # Validation
+        if not username or not email or not password:
+            return render_template("register.html", error="All fields are required!")
+        
+        if password != confirm_password:
+            return render_template("register.html", error="Passwords do not match!")
+        
+        if len(password) < 6:
+            return render_template("register.html", error="Password must be at least 6 characters!")
+        
+        # Check if user already exists
+        conn = sqlite3.connect('codex.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
+        existing_user = cursor.fetchone()
+        
+        if existing_user:
+            conn.close()
+            return render_template("register.html", error="Username or email already exists!")
+        
+        # Create new user
+        hashed_password = generate_password_hash(password)
+        try:
+            cursor.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+                         (username, email, hashed_password))
+            conn.commit()
+            conn.close()
+            flash("Registration successful! Please login.", "success")
+            return redirect(url_for("login"))
+        except Exception as e:
+            conn.close()
+            return render_template("register.html", error=f"Registration failed: {str(e)}")
+    
+    return render_template("register.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 def check_user():
-    return request.cookies.get("user")
+    return session.get('username')
 
 @app.route("/main")
 def main():
@@ -247,41 +328,128 @@ def simulate_simple_python(code):
     return steps, outputs
 
 
-# ---------------- JUDGE0 FREE API ----------------
-JUDGE0_URL = "https://ce.judge0.com/submissions/"
+# ---------------- JUDGE0 API with fallback options ----------------
+# Try local Judge0 first (if running Docker), then fall back to free API
+JUDGE0_URLS = [
+    "http://localhost:2358",  # Local Docker instance
+    "https://judge0-ce.p.rapidapi.com",  # RapidAPI (requires API key)
+    "https://ce.judge0.com"  # Free API (may have rate limits/connectivity issues)
+]
+
+# RapidAPI key (optional - sign up at https://rapidapi.com/judge0-official/api/judge0-ce)
+RAPIDAPI_KEY = None  # Set this to your API key if you want to use RapidAPI
 
 
 def run_judge0(code, language_id=71, stdin=""):
+    """
+    Try to run code on Judge0 with multiple fallback options:
+    1. Local Docker instance (fastest, most reliable)
+    2. RapidAPI (if API key is configured)
+    3. Free public API (may have connectivity issues)
+    """
     payload = {
         "source_code": code,
         "language_id": language_id,
         "stdin": stdin
     }
-    try:
-        submit = requests.post(
-            "https://ce.judge0.com/submissions/?base64_encoded=false&wait=false",
-            json=payload
-        )
-        if submit.status_code != 201:
-            return f"❌ Error submitting code: {submit.text}"
-        token = submit.json().get("token")
+    
+    last_error = None
+    
+    # Try each Judge0 endpoint
+    for base_url in JUDGE0_URLS:
+        # Skip RapidAPI if no key configured
+        if "rapidapi.com" in base_url and not RAPIDAPI_KEY:
+            continue
+            
+        try:
+            headers = {"Content-Type": "application/json"}
+            
+            # Add RapidAPI headers if needed
+            if "rapidapi.com" in base_url and RAPIDAPI_KEY:
+                headers.update({
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com"
+                })
+            
+            # Submit code
+            submit = requests.post(
+                f"{base_url}/submissions/?base64_encoded=false&wait=false",
+                json=payload,
+                headers=headers,
+                timeout=10
+            )
+            
+            if submit.status_code not in [200, 201]:
+                last_error = f"Server returned status {submit.status_code}"
+                continue
+                
+            token = submit.json().get("token")
+            if not token:
+                last_error = "No token received from server"
+                continue
 
-        # Poll for result
-        while True:
-            res = requests.get(f"https://ce.judge0.com/submissions/{token}?base64_encoded=false")
-            result = res.json()
-            status = result.get("status", {}).get("description")
-            if status not in ["In Queue", "Processing"]:
-                output = ""
-                if result.get("stdout"):
-                    output += result.get("stdout")
-                if result.get("stderr"):
-                    output += "\n[stderr]:\n" + result.get("stderr")
-                if result.get("compile_output"):
-                    output += "\n[compile_output]:\n" + result.get("compile_output")
-                return output or "⚠️ No output"
-    except Exception as e:
-        return f"⚠️ Error communicating with Judge0: {str(e)}"
+            # Poll for result (max 60 attempts = 60 seconds)
+            import time
+            for attempt in range(60):
+                time.sleep(1)
+                res = requests.get(
+                    f"{base_url}/submissions/{token}?base64_encoded=false",
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if res.status_code != 200:
+                    break
+                    
+                result = res.json()
+                status = result.get("status", {}).get("description")
+                
+                if status not in ["In Queue", "Processing"]:
+                    output = ""
+                    if result.get("stdout"):
+                        output += result.get("stdout")
+                    if result.get("stderr"):
+                        output += "\n[stderr]:\n" + result.get("stderr")
+                    if result.get("compile_output"):
+                        output += "\n[compile_output]:\n" + result.get("compile_output")
+                    return output or "⚠️ No output"
+            
+            last_error = "Timeout waiting for execution"
+            
+        except requests.exceptions.ConnectionError:
+            last_error = f"Cannot connect to {base_url}"
+            continue
+        except requests.exceptions.Timeout:
+            last_error = f"Request timeout for {base_url}"
+            continue
+        except requests.exceptions.RequestException as e:
+            last_error = f"Request error: {str(e)}"
+            continue
+        except Exception as e:
+            last_error = f"Unexpected error: {str(e)}"
+            continue
+    
+    # If all endpoints failed, return error with instructions
+    error_msg = f"❌ Cannot connect to Judge0 API\n\n"
+    error_msg += f"Last error: {last_error}\n\n"
+    error_msg += "💡 Solutions:\n\n"
+    error_msg += "1️⃣ CHECK YOUR INTERNET CONNECTION\n"
+    error_msg += "   • Make sure you're connected to the internet\n"
+    error_msg += "   • Try opening https://ce.judge0.com in your browser\n\n"
+    error_msg += "2️⃣ USE LOCAL JUDGE0 (Recommended)\n"
+    error_msg += "   • Install Docker Desktop: https://www.docker.com/products/docker-desktop\n"
+    error_msg += "   • Open terminal in the 'Judge0' folder\n"
+    error_msg += "   • Run: docker-compose up -d\n"
+    error_msg += "   • This runs Judge0 locally (no internet needed!)\n\n"
+    error_msg += "3️⃣ CHECK FIREWALL/ANTIVIRUS\n"
+    error_msg += "   • Your firewall might be blocking the connection\n"
+    error_msg += "   • Try temporarily disabling it\n\n"
+    error_msg += "4️⃣ USE RAPIDAPI (Alternative)\n"
+    error_msg += "   • Sign up at: https://rapidapi.com/judge0-official/api/judge0-ce\n"
+    error_msg += "   • Get your API key (free tier available)\n"
+    error_msg += "   • Add it to app.py: RAPIDAPI_KEY = 'your-key-here'\n"
+    
+    return error_msg
 
 
 # ---------------- RUN CODE ----------------
@@ -318,34 +486,79 @@ def compile_code():
         "language_id": language_id,
         "stdin": stdin
     }
-    try:
-        submit = requests.post(
-            "https://ce.judge0.com/submissions/?base64_encoded=false&wait=false",
-            json=payload,
-            timeout=10
-        )
-        if submit.status_code not in (201, 200):
-            return jsonify({"error": "Failed to submit to Judge0", "detail": submit.text}), 502
-        token = submit.json().get("token")
-
-        # Poll for a short period
-        for _ in range(60):
-            res = requests.get(f"https://ce.judge0.com/submissions/{token}?base64_encoded=false")
-            if res.status_code != 200:
-                break
-            result = res.json()
-            status = result.get("status", {}).get("description")
-            if status not in ["In Queue", "Processing"]:
-                return jsonify({
-                    "status": status,
-                    "stdout": result.get("stdout"),
-                    "stderr": result.get("stderr"),
-                    "compile_output": result.get("compile_output"),
-                    "message": result.get("message")
+    
+    import time
+    last_error = None
+    
+    # Try each Judge0 endpoint
+    for base_url in JUDGE0_URLS:
+        # Skip RapidAPI if no key configured
+        if "rapidapi.com" in base_url and not RAPIDAPI_KEY:
+            continue
+            
+        try:
+            headers = {"Content-Type": "application/json"}
+            
+            # Add RapidAPI headers if needed
+            if "rapidapi.com" in base_url and RAPIDAPI_KEY:
+                headers.update({
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com"
                 })
-        return jsonify({"error": "Timeout waiting for Judge0 result"}), 504
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": "Judge0 request failed", "detail": str(e)}), 502
+            
+            submit = requests.post(
+                f"{base_url}/submissions/?base64_encoded=false&wait=false",
+                json=payload,
+                headers=headers,
+                timeout=10
+            )
+            
+            if submit.status_code not in (201, 200):
+                last_error = f"Server returned {submit.status_code}"
+                continue
+                
+            token = submit.json().get("token")
+            if not token:
+                last_error = "No token received"
+                continue
+
+            # Poll for result
+            for _ in range(60):
+                time.sleep(1)
+                res = requests.get(
+                    f"{base_url}/submissions/{token}?base64_encoded=false",
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if res.status_code != 200:
+                    break
+                    
+                result = res.json()
+                status = result.get("status", {}).get("description")
+                
+                if status not in ["In Queue", "Processing"]:
+                    return jsonify({
+                        "status": status,
+                        "stdout": result.get("stdout"),
+                        "stderr": result.get("stderr"),
+                        "compile_output": result.get("compile_output"),
+                        "message": result.get("message")
+                    })
+            
+            last_error = "Timeout waiting for result"
+            
+        except requests.exceptions.ConnectionError:
+            last_error = f"Cannot connect to {base_url}"
+            continue
+        except requests.exceptions.Timeout:
+            last_error = f"Timeout for {base_url}"
+            continue
+        except requests.exceptions.RequestException as e:
+            last_error = str(e)
+            continue
+    
+    return jsonify({"error": "All Judge0 endpoints failed", "detail": last_error}), 502
 
 
 def simple_python_optimizer(code: str) -> str:
@@ -658,31 +871,84 @@ def auto_fix_java(code, issues):
 
 
 def auto_fix_javascript(code, issues):
-    """Auto-fix common JavaScript errors."""
+    """Auto-fix common JavaScript errors - comprehensive fixes."""
     fixed_lines = []
     lines = code.splitlines()
     
-    for line in lines:
+    for i, line in enumerate(lines):
         fixed_line = line
         stripped = line.strip()
+        indent = line[:len(line) - len(line.lstrip())]
         
-        # Add missing semicolons
-        if stripped and not stripped.endswith((";", "{", "}", ",")):
-            if any(keyword in stripped for keyword in ["let", "const", "var", "return", "break", "continue"]):
-                if not stripped.endswith(";"):
-                    fixed_line = line + ";"
-        
-        # Fix console.log
-        if "console.log" in stripped and not "(" in stripped.split("console.log")[1][:2]:
-            fixed_line = line.replace("console.log", "console.log(") + ")"
+        # Skip empty lines and comments
+        if not stripped or stripped.startswith("//"):
+            fixed_lines.append(fixed_line)
+            continue
         
         # Fix var to let/const
         if stripped.startswith("var "):
-            fixed_line = line.replace("var ", "let ")
+            fixed_line = line.replace("var ", "let ", 1)
+            stripped = fixed_line.strip()
+        
+        # Fix == to ===
+        if " == " in stripped and " === " not in stripped:
+            fixed_line = fixed_line.replace(" == ", " === ")
+            stripped = fixed_line.strip()
+        
+        # Fix != to !==
+        if " != " in stripped and " !== " not in stripped:
+            fixed_line = fixed_line.replace(" != ", " !== ")
+            stripped = fixed_line.strip()
+        
+        # Add missing semicolons (comprehensive)
+        needs_semicolon = False
+        if stripped and not stripped.endswith((";", "{", "}", ",", ":", "/*", "*/")):
+            # Variable declarations
+            if stripped.startswith(("let ", "const ", "var ")):
+                needs_semicolon = True
+            # Function calls
+            elif re.search(r'\w+\s*\([^{]*\)\s*$', stripped):
+                needs_semicolon = True
+            # Return, break, continue
+            elif stripped.startswith(("return", "break", "continue")):
+                needs_semicolon = True
+            # Assignments
+            elif "=" in stripped and not stripped.endswith("=>"):
+                needs_semicolon = True
+            
+            if needs_semicolon:
+                fixed_line = line + ";"
+                stripped = fixed_line.strip()
+        
+        # Fix console.log without parentheses
+        if "console.log" in stripped:
+            if "console.log(" not in stripped:
+                fixed_line = line.replace("console.log", "console.log(") + ")"
+                stripped = fixed_line.strip()
+        
+        # Add missing opening braces for if/else/for/while
+        if re.match(r'^(if|else if|while|for)\s*\([^)]*\)\s*$', stripped):
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if next_line and not next_line.startswith("{"):
+                    fixed_line = line + " {"
+        
+        # Fix missing closing braces (basic detection)
+        if stripped == "else" and i + 1 < len(lines):
+            next_line = lines[i + 1].strip()
+            if next_line and not next_line.startswith("{"):
+                fixed_line = line + " {"
         
         fixed_lines.append(fixed_line)
     
-    return "\n".join(fixed_lines)
+    # Balance braces
+    fixed_code = "\n".join(fixed_lines)
+    open_braces = fixed_code.count("{")
+    close_braces = fixed_code.count("}")
+    if open_braces > close_braces:
+        fixed_code += "\n" + "}" * (open_braces - close_braces)
+    
+    return fixed_code
 
 
 def auto_fix_c_cpp(code, issues):

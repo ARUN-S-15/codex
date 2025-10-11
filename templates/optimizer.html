@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CODEX - Optimizer</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Prism.js for Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+  
   <style>
     body {
       margin: 0;
@@ -14,96 +24,6 @@
       display: flex;
       height: 100vh;
       overflow: hidden;
-    }
-    nav .logo {
-      font-weight: 700;
-      font-size: 1.3rem;
-      color: #10a37f;
-    }
-
-    nav ul {
-      display: flex;
-      list-style: none;
-      gap: 1.5rem;
-    }
-
-    nav ul li a {
-      text-decoration: none;
-      color: #ececf1;
-      font-weight: 500;
-    }
-
-    nav ul li a.active {
-      color: #10a37f;
-    }
-    /* Sidebar (History) */
-    .sidebar {
-      width: 250px;
-      background: #111;
-      border-right: 1px solid #2a2b32;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.3s ease;
-      z-index: 5;
-    }
-    .sidebar.hidden {
-      transform: translateX(-100%);
-    }
-
-    .sidebar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      background: #202123;
-      border-bottom: 1px solid #2a2b32;
-    }
-    .sidebar-header h3 {
-      margin: 0;
-      font-size: 1.1rem;
-      color: #10a37f;
-    }
-    .sidebar-header button {
-      background: none;
-      border: none;
-      color: #10a37f;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    .history-list {
-      flex: 1;
-      overflow-y: auto;
-      list-style: none;
-      padding: 0.5rem;
-      margin: 0;
-    }
-    .history-list li {
-      padding: 0.5rem;
-      margin-bottom: 0.3rem;
-      background: #1d1d1d;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-    .history-list li:hover {
-      background: #2a2b32;
-    }
-
-    /* Reopen button (when sidebar hidden) */
-    .reopen-btn {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 0.4rem 0.8rem;
-      background: #10a37f;
-      border: none;
-      border-radius: 6px;
-      color: #fff;
-      cursor: pointer;
-      font-size: 0.85rem;
-      display: none;
-      z-index: 10;
     }
 
     /* Main editor area */
@@ -119,13 +39,32 @@
 
     .editor-wrapper {
       position: relative;
-      flex: 0 0 50%; /* Always 50% width */
+      flex: 1;
       display: flex;
+      flex-direction: column;
     }
+    
+    .editor-header {
+      background: #40414f;
+      padding: 0.8rem 1rem;
+      border-radius: 10px 10px 0 0;
+      margin-bottom: 0;
+    }
+    
+    .editor-header h3 {
+      margin: 0;
+      color: #10a37f;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    
     .editor-container {
       display: flex;
       position: relative;
       flex: 1;
+      background: #40414f;
+      border-radius: 0 0 10px 10px;
+      overflow: hidden;
     }
 
     /* Line numbers */
@@ -134,59 +73,133 @@
       color: #9ca3af;
       padding: 1rem 0.5rem;
       text-align: right;
-      font-family: monospace;
-      font-size: 1rem;
-      border-radius: 10px 0 0 10px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 1.2rem;
+      border-radius: 0;
       user-select: none;
       white-space: pre;
-      line-height: 2;
+      line-height: 1.8rem;
+      overflow: hidden;
+    }
+
+    /* Syntax highlighting wrapper */
+    .code-wrapper {
+      position: relative;
+      flex: 1;
+      display: flex;
+      background: #1d1d1d;
+    }
+    
+    .syntax-highlight {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      margin: 0;
+      padding: 1rem;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 1.2rem;
+      line-height: 1.8rem;
+      pointer-events: none;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow: hidden;
+      background: transparent;
+      border: none;
+      tab-size: 4;
+      z-index: 0;
+    }
+    
+    .syntax-highlight code {
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+      font-size: 1.2rem !important;
+      line-height: 1.8rem !important;
+      background: transparent !important;
+      padding: 0 !important;
+      margin: 0 !important;
     }
 
     /* Textarea editor */
     .editor-container textarea {
+      position: relative;
       flex: 1;
-      background: #1d1d1d;
-      color: #ececf1;
+      background: transparent;
+      color: transparent;
       border: none;
-      border-radius: 0 10px 10px 0;
+      border-radius: 0;
       padding: 1rem;
-      font-family: monospace;
-      font-size: 1rem;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 1.2rem;
       resize: none;
-      line-height: 1.4rem;
+      line-height: 1.8rem;
       border-color: #000;
+      outline: none;
+      tab-size: 4;
+      caret-color: #ececf1;
+      -webkit-text-fill-color: transparent;
+      z-index: 1;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .editor-container textarea::placeholder {
+      color: #666;
+      -webkit-text-fill-color: #666;
+      opacity: 1;
+    }
+    
+    .editor-container textarea::selection {
+      background: rgba(16, 163, 127, 0.3);
+    }
+    
+    /* Make optimized code editable with syntax highlighting */
+    #optimizedCode {
+      color: transparent !important;
+      -webkit-text-fill-color: transparent !important;
+      cursor: text;
+    }
+    
+    #optimizedCode::selection {
+      background: rgba(16, 163, 127, 0.3);
     }
 
     /* Copy Button */
     .copy-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 0.8rem;
+      right: 1rem;
       padding: 0.4rem 0.8rem;
-      background: #10a37f;
-      color: #fff;
-      border: none;
+      background: transparent;
+      color: #10a37f;
+      border: 1px solid #10a37f;
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.85rem;
-      transition: background 0.2s ease;
+      transition: all 0.2s ease;
+      z-index: 10;
     }
     .copy-btn:hover {
-      background: #0d8b6d;
+      background: #10a37f;
+      color: #fff;
     }
 
     /* Optimize Button */
+    .btn-container {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    
     .btn {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      padding: 0.8rem 1.5rem;
+      padding: 0.8rem 2rem;
       background: #10a37f;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       color: #fff;
       cursor: pointer;
       font-size: 1rem;
+      font-weight: 600;
       transition: background 0.2s ease;
     }
     .btn:hover {
@@ -196,7 +209,7 @@
     /* Optimized editor (hidden initially) */
     #optimizedWrapper {
       display: none;
-      flex: 0 0 50%; /* Always 50% */
+      flex: 1;
       animation: fadeIn 0.5s ease-in-out;
     }
     @keyframes fadeIn {
@@ -206,38 +219,38 @@
   </style>
 </head>
 <body>
-  <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <h3>History</h3>
-      <button id="closeSidebarBtn">✖</button>
-    </div>
-    <ul class="history-list" id="historyList">
-      <li>No history yet...</li>
-    </ul>
-  </aside>
-
-  <!-- Reopen Sidebar Button -->
-  <button id="reopenBtn" class="reopen-btn">📜 History</button>
-  
   <!-- Main Editor -->
   <div class="main">
     <!-- User Code Box -->
     <div class="editor-wrapper" id="inputWrapper">
-      <div class="editor-container">
-        <div class="line-numbers" id="lineNumbers">1</div>
-        <textarea id="codeInput" placeholder="Write or paste your code here..."></textarea>
+      <div class="editor-header">
+        <h3>📝 Original Code</h3>
         <button class="copy-btn" id="copyInputBtn">Copy</button>
       </div>
-      <button id="optimizeBtn" class="btn">🚀 Optimize</button>
+      <div class="editor-container">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <div class="code-wrapper">
+          <pre class="syntax-highlight" id="syntaxHighlightInput"><code id="highlightedCodeInput" class="language-python"></code></pre>
+          <textarea id="codeInput" placeholder="Write or paste your code here..."></textarea>
+        </div>
+      </div>
+      <div class="btn-container">
+        <button id="optimizeBtn" class="btn">🚀 Optimize Code</button>
+      </div>
     </div>
 
     <!-- Optimized Code Box -->
     <div class="editor-wrapper" id="optimizedWrapper">
+      <div class="editor-header">
+        <h3>✨ Optimized Code</h3>
+        <button class="copy-btn" id="copyOutputBtn">Copy</button>
+      </div>
       <div class="editor-container">
         <div class="line-numbers" id="lineNumbersOut">1</div>
-        <textarea id="optimizedCode" readonly></textarea>
-        <button class="copy-btn" id="copyOutputBtn">Copy</button>
+        <div class="code-wrapper">
+          <pre class="syntax-highlight" id="syntaxHighlightOutput"><code id="highlightedCodeOutput" class="language-python"></code></pre>
+          <textarea id="optimizedCode"></textarea>
+        </div>
       </div>
     </div>
   </div>
@@ -247,66 +260,154 @@
     const lineNumbers = document.getElementById("lineNumbers");
     const optimizedCodeBox = document.getElementById("optimizedCode");
     const lineNumbersOut = document.getElementById("lineNumbersOut");
-    const historyList = document.getElementById("historyList");
     const optimizedWrapper = document.getElementById("optimizedWrapper");
-    const sidebar = document.getElementById("sidebar");
-    const closeSidebarBtn = document.getElementById("closeSidebarBtn");
-    const reopenBtn = document.getElementById("reopenBtn");
+    
+    const highlightedCodeInput = document.getElementById("highlightedCodeInput");
+    const syntaxHighlightInput = document.getElementById("syntaxHighlightInput");
+    const highlightedCodeOutput = document.getElementById("highlightedCodeOutput");
+    const syntaxHighlightOutput = document.getElementById("syntaxHighlightOutput");
+
+    // Load code from localStorage when page loads
+    window.addEventListener("DOMContentLoaded", () => {
+      const savedCode = localStorage.getItem("optimizeCode");
+      const savedLanguage = localStorage.getItem("optimizeLanguage");
+      
+      if (savedCode) {
+        textarea.value = savedCode;
+        updateLineNumbers(textarea, lineNumbers);
+        updateSyntaxHighlight(textarea.value, highlightedCodeInput);
+        
+        // Clear localStorage after loading
+        localStorage.removeItem("optimizeCode");
+        localStorage.removeItem("optimizeLanguage");
+        
+        // Auto-optimize the loaded code
+        optimizeCode();
+      }
+    });
 
     // Update line numbers
     function updateLineNumbers(textarea, lineBox) {
       const lines = textarea.value.split("\n").length;
       lineBox.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
     }
+    
+    // Update syntax highlighting
+    function updateSyntaxHighlight(code, highlightElement) {
+      highlightElement.textContent = code;
+      if (window.Prism) {
+        Prism.highlightElement(highlightElement);
+      }
+    }
+    
+    // Sync scroll
+    function syncScroll(source, target1, target2) {
+      target1.scrollTop = source.scrollTop;
+      target1.scrollLeft = source.scrollLeft;
+      if (target2) {
+        target2.scrollTop = source.scrollTop;
+      }
+    }
 
-    textarea.addEventListener("input", () => updateLineNumbers(textarea, lineNumbers));
-    textarea.addEventListener("scroll", () => (lineNumbers.scrollTop = textarea.scrollTop));
-    optimizedCodeBox.addEventListener("scroll", () => (lineNumbersOut.scrollTop = optimizedCodeBox.scrollTop));
+    textarea.addEventListener("input", () => {
+      updateLineNumbers(textarea, lineNumbers);
+      updateSyntaxHighlight(textarea.value, highlightedCodeInput);
+    });
+    
+    textarea.addEventListener("scroll", () => {
+      syncScroll(textarea, syntaxHighlightInput, lineNumbers);
+    });
+    
+    optimizedCodeBox.addEventListener("scroll", () => {
+      syncScroll(optimizedCodeBox, syntaxHighlightOutput, lineNumbersOut);
+    });
+    
+    optimizedCodeBox.addEventListener("input", () => {
+      updateLineNumbers(optimizedCodeBox, lineNumbersOut);
+      updateSyntaxHighlight(optimizedCodeBox.value, highlightedCodeOutput);
+    });
+    
     updateLineNumbers(textarea, lineNumbers);
 
-    // Optimize mock function
-    document.getElementById("optimizeBtn").addEventListener("click", () => {
+    // Optimize function - calls backend API
+    async function optimizeCode() {
       const code = textarea.value.trim();
       if (!code) {
         alert("⚠️ Please write or paste some code first.");
         return;
       }
 
-      optimizedCodeBox.value = code + 
-        "\n\n// 🚀 Optimized version:\n// - Loops simplified\n// - Variables reduced\n// - Conditions optimized";
-
+      // Show loading state
+      optimizedCodeBox.value = "⏳ Optimizing your code...";
       optimizedWrapper.style.display = "flex";
       updateLineNumbers(optimizedCodeBox, lineNumbersOut);
+      updateSyntaxHighlight(optimizedCodeBox.value, highlightedCodeOutput);
 
-      // Add entry to history
-      if (historyList.firstElementChild.textContent === "No history yet...") {
-        historyList.innerHTML = "";
+      try {
+        const response = await fetch("/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, language: "python" })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+          optimizedCodeBox.value = `❌ Error: ${data.error}\n\n${data.detail || ""}`;
+        } else {
+          let result = data.optimized || code;
+          
+          // Add optimization notes
+          if (data.notes && data.notes.length > 0) {
+            result += "\n\n// 📝 Optimization Notes:\n";
+            data.notes.forEach(note => {
+              result += `// - ${note}\n`;
+            });
+          }
+          
+          optimizedCodeBox.value = result;
+        }
+      } catch (err) {
+        optimizedCodeBox.value = `❌ Failed to optimize: ${err.message}`;
       }
-      const li = document.createElement("li");
-      li.textContent = "Run at " + new Date().toLocaleTimeString();
-      historyList.appendChild(li);
-    });
+
+      updateLineNumbers(optimizedCodeBox, lineNumbersOut);
+      updateSyntaxHighlight(optimizedCodeBox.value, highlightedCodeOutput);
+    }
+
+    // Optimize button click handler
+    document.getElementById("optimizeBtn").addEventListener("click", optimizeCode);
 
     // Copy Input
     document.getElementById("copyInputBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(textarea.value);
-      alert("Copied input code!");
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const btn = document.getElementById("copyInputBtn");
+        const originalText = btn.textContent;
+        btn.textContent = "✓ Copied!";
+        btn.style.background = "#10a37f";
+        btn.style.color = "#fff";
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = "";
+          btn.style.color = "";
+        }, 2000);
+      });
     });
 
     // Copy Output
     document.getElementById("copyOutputBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(optimizedCodeBox.value);
-      alert("Copied optimized code!");
-    });
-
-    // Sidebar controls
-    closeSidebarBtn.addEventListener("click", () => {
-      sidebar.classList.add("hidden");
-      reopenBtn.style.display = "block";
-    });
-    reopenBtn.addEventListener("click", () => {
-      sidebar.classList.remove("hidden");
-      reopenBtn.style.display = "none";
+      navigator.clipboard.writeText(optimizedCodeBox.value).then(() => {
+        const btn = document.getElementById("copyOutputBtn");
+        const originalText = btn.textContent;
+        btn.textContent = "✓ Copied!";
+        btn.style.background = "#10a37f";
+        btn.style.color = "#fff";
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = "";
+          btn.style.color = "";
+        }, 2000);
+      });
     });
   </script>
 </body>
