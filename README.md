@@ -54,7 +54,7 @@ A web-based code development environment that lets you compile, debug, and optim
 python --version
 
 # Install Python dependencies
-pip install flask requests pylint
+pip install -r requirements.txt
 
 # Install Node.js and ESLint (for JavaScript debugging)
 npm install -g eslint
@@ -62,6 +62,28 @@ npm install -g eslint
 # Initialize ESLint config (run in project root)
 npm init @eslint/config
 ```
+
+### Environment Configuration
+
+1. **Copy the environment template:**
+   ```powershell
+   cp .env.example .env
+   ```
+
+2. **Generate a secure secret key:**
+   ```powershell
+   python -c "import os; print(os.urandom(24).hex())"
+   ```
+
+3. **Update `.env` file with your generated secret key:**
+   ```env
+   SECRET_KEY=your-generated-key-here
+   DATABASE_URL=sqlite:///codex.db
+   FLASK_ENV=development
+   FLASK_DEBUG=True
+   ```
+
+⚠️ **Security Warning**: Never commit your `.env` file to version control! It's already in `.gitignore`.
 
 ### Optional: Install cppcheck for C/C++ debugging
 ```powershell
@@ -149,16 +171,26 @@ Then open your browser to: `http://127.0.0.1:5000`
 | `/debug` | POST | Run linter analysis |
 | `/optimize` | POST | Optimize code (Python only) |
 
-## Security Notes
+## Security Features ✅
 
-⚠️ **Important**: This is a development/learning tool. For production:
+- **Database Authentication**: SQLite with hashed passwords (Werkzeug)
+- **Session Management**: Secure Flask sessions
+- **Environment Variables**: Secrets stored in `.env` (not in code)
+- **Password Security**: Minimum 6 characters, hashed storage
+- **Protected Routes**: Login required for all features
 
-1. **Add authentication**: Current login is hardcoded (`admin`/`123`)
-2. **Sandbox linters**: Run linters in containers or isolated environments
-3. **Rate limiting**: Prevent abuse of Judge0 API
-4. **Input validation**: Sanitize all user code before processing
-5. **HTTPS**: Use TLS in production
-6. **Resource limits**: Cap code execution time and memory
+## Additional Security for Production
+
+⚠️ **Important**: For production deployment, also implement:
+
+1. ✅ ~~Authentication~~ (Done - database with hashed passwords)
+2. **CSRF Protection**: Add `flask-wtf` for form security
+3. **Rate limiting**: Prevent abuse of Judge0 API (use `flask-limiter`)
+4. **Sandbox linters**: Run linters in containers or isolated environments
+5. **Input validation**: Sanitize all user code before processing
+6. **HTTPS**: Use TLS in production (Let's Encrypt)
+7. **Resource limits**: Cap code execution time and memory
+8. **SQL Injection**: Already using parameterized queries ✅
 
 ## Linter Configuration
 

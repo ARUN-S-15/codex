@@ -71,7 +71,7 @@
     .line-numbers {
       background: #2a2b32;
       color: #9ca3af;
-      padding: 1rem 0.5rem;
+      padding: 1rem 0.8rem;
       text-align: right;
       font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
       font-size: 1.2rem;
@@ -80,6 +80,9 @@
       white-space: pre;
       line-height: 1.8rem;
       overflow: hidden;
+      min-width: 50px;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
 
     /* Syntax highlighting wrapper */
@@ -109,6 +112,8 @@
       border: none;
       tab-size: 4;
       z-index: 0;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
     
     .syntax-highlight code {
@@ -118,6 +123,8 @@
       background: transparent !important;
       padding: 0 !important;
       margin: 0 !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
     }
 
     /* Textarea editor */
@@ -141,6 +148,8 @@
       z-index: 1;
       white-space: pre-wrap;
       word-wrap: break-word;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
     
     .editor-container textarea::placeholder {
@@ -216,6 +225,97 @@
       from { opacity: 0; transform: translateX(10px); }
       to { opacity: 1; transform: translateX(0); }
     }
+    
+    /* Optimizations Table Styling */
+    .optimizations-container {
+      margin-top: 1rem;
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.15) 0%, rgba(16, 163, 127, 0.05) 100%);
+      border-left: 4px solid #10a37f;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .optimizations-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 2px solid rgba(16, 163, 127, 0.3);
+    }
+    
+    .optimizations-badge {
+      display: inline-block;
+      padding: 0.4rem 0.9rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #10a37f;
+      color: #fff;
+      margin-right: 0.8rem;
+    }
+    
+    .optimizations-title {
+      color: #10a37f;
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    
+    .optimizations-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    
+    .optimizations-table thead {
+      background: rgba(16, 163, 127, 0.2);
+    }
+    
+    .optimizations-table th {
+      padding: 0.8rem;
+      text-align: left;
+      color: #10a37f;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-bottom: 2px solid rgba(16, 163, 127, 0.3);
+    }
+    
+    .optimizations-table td {
+      padding: 1rem 0.8rem;
+      color: #ececf1;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      vertical-align: top;
+    }
+    
+    .optimizations-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .optimizations-table tr:hover {
+      background: rgba(16, 163, 127, 0.05);
+    }
+    
+    .change-badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      background: rgba(16, 163, 127, 0.2);
+      border: 1px solid #10a37f;
+      border-radius: 6px;
+      color: #10a37f;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-right: 0.5rem;
+    }
+    
+    .benefit-text {
+      color: #b4b4b4;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -252,6 +352,9 @@
           <textarea id="optimizedCode"></textarea>
         </div>
       </div>
+      
+      <!-- Optimizations Table -->
+      <div id="optimizationsContainer" style="display: none;"></div>
     </div>
   </div>
 
@@ -340,6 +443,7 @@
       // Show loading state
       optimizedCodeBox.value = "⏳ Optimizing your code...";
       optimizedWrapper.style.display = "flex";
+      document.getElementById("optimizationsContainer").style.display = "none";
       updateLineNumbers(optimizedCodeBox, lineNumbersOut);
       updateSyntaxHighlight(optimizedCodeBox.value, highlightedCodeOutput);
 
@@ -354,25 +458,66 @@
         
         if (data.error) {
           optimizedCodeBox.value = `❌ Error: ${data.error}\n\n${data.detail || ""}`;
+          document.getElementById("optimizationsContainer").style.display = "none";
         } else {
-          let result = data.optimized || code;
+          // Display optimized code
+          optimizedCodeBox.value = data.optimized || code;
           
-          // Add optimization notes
-          if (data.notes && data.notes.length > 0) {
-            result += "\n\n// 📝 Optimization Notes:\n";
-            data.notes.forEach(note => {
-              result += `// - ${note}\n`;
-            });
+          // Display optimizations table
+          if (data.optimizations && data.optimizations.length > 0) {
+            displayOptimizations(data.optimizations);
+          } else {
+            document.getElementById("optimizationsContainer").style.display = "none";
           }
-          
-          optimizedCodeBox.value = result;
         }
       } catch (err) {
         optimizedCodeBox.value = `❌ Failed to optimize: ${err.message}`;
+        document.getElementById("optimizationsContainer").style.display = "none";
       }
 
       updateLineNumbers(optimizedCodeBox, lineNumbersOut);
       updateSyntaxHighlight(optimizedCodeBox.value, highlightedCodeOutput);
+    }
+    
+    // Display optimizations in a styled table
+    function displayOptimizations(optimizations) {
+      const container = document.getElementById("optimizationsContainer");
+      
+      let html = `
+        <div class="optimizations-container">
+          <div class="optimizations-header">
+            <span class="optimizations-badge">✅ OPTIMIZATIONS</span>
+            <h3 class="optimizations-title">Optimizations Made</h3>
+          </div>
+          <table class="optimizations-table">
+            <thead>
+              <tr>
+                <th style="width: 25%;">Change</th>
+                <th style="width: 40%;">Description</th>
+                <th style="width: 35%;">Benefit</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      optimizations.forEach(opt => {
+        html += `
+          <tr>
+            <td><span class="change-badge">✅ ${opt.change}</span></td>
+            <td>${opt.description}</td>
+            <td class="benefit-text">${opt.benefit}</td>
+          </tr>
+        `;
+      });
+      
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      container.innerHTML = html;
+      container.style.display = "block";
     }
 
     // Optimize button click handler

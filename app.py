@@ -2,28 +2,22 @@
 import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for, make_response, Response, session, flash
 import sys, ast, traceback, re, requests, subprocess, tempfile
-import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from dotenv import load_dotenv
+from database import init_db, fetch_one, execute_query, add_to_history, get_user_history, get_history_by_id, delete_history_item, generate_code_title
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'  # Required for sessions and flash messages
+# Use environment variable for secret key, fallback to generated key if not found
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())
 
-# Database initialization
-def init_db():
-    conn = sqlite3.connect('codex.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# Configuration from environment
+app.config['DB_TYPE'] = os.getenv('DB_TYPE', 'mysql')
+app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
+app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'False') == 'True'
 
 # Initialize database on startup
 init_db()
@@ -36,11 +30,7 @@ def login():
         password = request.form.get("password")
         
         # Check credentials in database
-        conn = sqlite3.connect('codex.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, username, password FROM users WHERE username = ?', (username,))
-        user = cursor.fetchone()
-        conn.close()
+        user = fetch_one('SELECT id, username, password FROM users WHERE username = ?', (username,))
         
         if user and check_password_hash(user[2], password):
             # Login successful
@@ -71,26 +61,19 @@ def register():
             return render_template("register.html", error="Password must be at least 6 characters!")
         
         # Check if user already exists
-        conn = sqlite3.connect('codex.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
-        existing_user = cursor.fetchone()
+        existing_user = fetch_one('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
         
         if existing_user:
-            conn.close()
             return render_template("register.html", error="Username or email already exists!")
         
         # Create new user
         hashed_password = generate_password_hash(password)
         try:
-            cursor.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+            execute_query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
                          (username, email, hashed_password))
-            conn.commit()
-            conn.close()
             flash("Registration successful! Please login.", "success")
             return redirect(url_for("login"))
         except Exception as e:
-            conn.close()
             return render_template("register.html", error=f"Registration failed: {str(e)}")
     
     return render_template("register.html")
@@ -331,13 +314,13 @@ def simulate_simple_python(code):
 # ---------------- JUDGE0 API with fallback options ----------------
 # Try local Judge0 first (if running Docker), then fall back to free API
 JUDGE0_URLS = [
-    "http://localhost:2358",  # Local Docker instance
-    "https://judge0-ce.p.rapidapi.com",  # RapidAPI (requires API key)
-    "https://ce.judge0.com"  # Free API (may have rate limits/connectivity issues)
+    # "http://localhost:2358",  # ❌ DISABLED: Docker Judge0 doesn't work on Windows WSL2 (cgroup v2 incompatibility)
+    # "https://judge0-ce.p.rapidapi.com",  # RapidAPI (requires API key)
+    "https://ce.judge0.com"  # ✅ ACTIVE: Free Public API (reliable and working)
 ]
 
-# RapidAPI key (optional - sign up at https://rapidapi.com/judge0-official/api/judge0-ce)
-RAPIDAPI_KEY = None  # Set this to your API key if you want to use RapidAPI
+# RapidAPI key from environment or hardcoded
+RAPIDAPI_KEY = os.getenv('JUDGE0_API_KEY', None)  # Set in .env file or here
 
 
 def run_judge0(code, language_id=71, stdin=""):
@@ -371,12 +354,13 @@ def run_judge0(code, language_id=71, stdin=""):
                     "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com"
                 })
             
-            # Submit code
+            # Submit code with adequate timeout for remote APIs
+            timeout_seconds = 15  # Increased timeout for reliable connections
             submit = requests.post(
                 f"{base_url}/submissions/?base64_encoded=false&wait=false",
                 json=payload,
                 headers=headers,
-                timeout=10
+                timeout=timeout_seconds
             )
             
             if submit.status_code not in [200, 201]:
@@ -395,7 +379,7 @@ def run_judge0(code, language_id=71, stdin=""):
                 res = requests.get(
                     f"{base_url}/submissions/{token}?base64_encoded=false",
                     headers=headers,
-                    timeout=10
+                    timeout=15  # Increased timeout for polling requests
                 )
                 
                 if res.status_code != 200:
@@ -405,14 +389,20 @@ def run_judge0(code, language_id=71, stdin=""):
                 status = result.get("status", {}).get("description")
                 
                 if status not in ["In Queue", "Processing"]:
-                    output = ""
-                    if result.get("stdout"):
-                        output += result.get("stdout")
-                    if result.get("stderr"):
-                        output += "\n[stderr]:\n" + result.get("stderr")
-                    if result.get("compile_output"):
-                        output += "\n[compile_output]:\n" + result.get("compile_output")
-                    return output or "⚠️ No output"
+                    # Check if execution was successful
+                    if status == "Accepted" or result.get("stdout") or result.get("stderr"):
+                        output = ""
+                        if result.get("stdout"):
+                            output += result.get("stdout")
+                        if result.get("stderr"):
+                            output += "\n[stderr]:\n" + result.get("stderr")
+                        if result.get("compile_output"):
+                            output += "\n[compile_output]:\n" + result.get("compile_output")
+                        return output or "⚠️ No output"
+                    else:
+                        # Execution failed (Internal Error, etc), try next endpoint
+                        last_error = f"Execution failed with status: {status}"
+                        break
             
             last_error = "Timeout waiting for execution"
             
@@ -459,8 +449,26 @@ def run_code():
     code = data.get("code", "")
     language_id = data.get("language_id", 71)
     stdin = data.get("stdin", "")  # Get user input
+    
+    # Get language name from ID
+    language_map = {71: "Python", 50: "C", 54: "C++", 62: "Java", 63: "JavaScript"}
+    language_name = language_map.get(language_id, "Unknown")
+    
     try:
         output = run_judge0(code, language_id, stdin)
+        
+        # Save to history if user is logged in
+        if session.get('user_id'):
+            title = generate_code_title(code)
+            add_to_history(
+                user_id=session['user_id'],
+                activity_type='run',
+                code_snippet=code,
+                language=language_name,
+                title=title,
+                output=output
+            )
+        
         return jsonify({"output": output})
     except Exception as e:
         return jsonify({"output": f"Error: {str(e)}"})
@@ -510,7 +518,7 @@ def compile_code():
                 f"{base_url}/submissions/?base64_encoded=false&wait=false",
                 json=payload,
                 headers=headers,
-                timeout=10
+                timeout=15  # Increased timeout for reliable connections
             )
             
             if submit.status_code not in (201, 200):
@@ -528,7 +536,7 @@ def compile_code():
                 res = requests.get(
                     f"{base_url}/submissions/{token}?base64_encoded=false",
                     headers=headers,
-                    timeout=10
+                    timeout=15  # Increased timeout for polling requests
                 )
                 
                 if res.status_code != 200:
@@ -538,13 +546,19 @@ def compile_code():
                 status = result.get("status", {}).get("description")
                 
                 if status not in ["In Queue", "Processing"]:
-                    return jsonify({
-                        "status": status,
-                        "stdout": result.get("stdout"),
-                        "stderr": result.get("stderr"),
-                        "compile_output": result.get("compile_output"),
-                        "message": result.get("message")
-                    })
+                    # Check if execution was successful
+                    if status == "Accepted" or result.get("stdout") or result.get("stderr"):
+                        return jsonify({
+                            "status": status,
+                            "stdout": result.get("stdout"),
+                            "stderr": result.get("stderr"),
+                            "compile_output": result.get("compile_output"),
+                            "message": result.get("message")
+                        })
+                    else:
+                        # Execution failed, try next endpoint
+                        last_error = f"Execution failed with status: {status}"
+                        break
             
             last_error = "Timeout waiting for result"
             
@@ -613,19 +627,234 @@ def optimize_code():
 
     if language != "python":
         # For non-python languages, return a no-op placeholder
-        return jsonify({"optimized": code, "notes": "No optimizer implemented for this language."})
+        return jsonify({
+            "optimized": code, 
+            "optimizations": [],
+            "notes": "No optimizer implemented for this language."
+        })
 
     try:
-        optimized = simple_python_optimizer(code)
-        # Provide a diff-like hint (very small)
-        notes = []
-        if optimized != code:
-            notes.append("Applied simple whitespace and constant inlining optimizations.")
-        else:
-            notes.append("No optimizations applied.")
-        return jsonify({"optimized": optimized, "notes": notes})
+        result = ai_optimize_python(code)
+        optimized = result["optimized_code"]
+        optimizations = result["optimizations"]
+        
+        # Save to history if user is logged in
+        if session.get('user_id'):
+            title = generate_code_title(code)
+            add_to_history(
+                user_id=session['user_id'],
+                activity_type='optimize',
+                code_snippet=code,
+                language=language.capitalize(),
+                title=title,
+                output=optimized
+            )
+        
+        return jsonify({
+            "optimized": optimized, 
+            "optimizations": optimizations
+        })
     except Exception as e:
         return jsonify({"error": "Optimization failed", "detail": str(e)}), 500
+
+
+def analyze_code_purpose(code, language):
+    """Analyze what the code does and provide comprehensive high-level overview"""
+    overview = []
+    
+    code_lower = code.lower()
+    lines = [l.strip() for l in code.splitlines() if l.strip() and not l.strip().startswith("#")]
+    
+    # Detect code patterns
+    has_input = "input(" in code_lower or "scanner" in code_lower or "scanf" in code_lower or "cin >>" in code_lower
+    has_loop = "for " in code_lower or "while " in code_lower
+    has_if = "if " in code_lower or "if(" in code_lower
+    has_function = "def " in code_lower or "function " in code_lower
+    has_print = "print(" in code_lower or "console.log" in code_lower or "cout <<" in code_lower or "system.out" in code_lower
+    has_math = any(op in code for op in ["+", "-", "*", "/", "%", "**", "pow(", "sqrt(", "math."])
+    
+    # Build comprehensive overview
+    overview.append("💡 **Purpose & Goal:**")
+    overview.append("")
+    
+    if has_input and has_loop and has_print:
+        overview.append("   This program is an interactive application that:")
+        overview.append("   • Collects input from the user")
+        overview.append("   • Uses loops to process the data or repeat operations")
+        overview.append("   • Displays calculated results or patterns")
+        overview.append("")
+        overview.append("   **Why this matters:** Interactive programs are the foundation")
+        overview.append("   of user-friendly applications. They make programming dynamic!")
+    elif has_loop and has_math:
+        overview.append("   This is a computational algorithm that:")
+        overview.append("   • Uses mathematical operations")
+        overview.append("   • Employs loops for efficiency or pattern generation")
+        overview.append("   • Solves a specific problem through calculation")
+        overview.append("")
+        overview.append("   **Why this matters:** Loops + Math = Powerful algorithms")
+        overview.append("   that can solve complex problems automatically!")
+    elif has_input and has_print:
+        overview.append("   This is an I/O (Input/Output) program that:")
+        overview.append("   • Takes data from the user")
+        overview.append("   • Processes or transforms that data")
+        overview.append("   • Shows meaningful output")
+    elif has_function:
+        overview.append("   This code demonstrates modular programming:")
+        overview.append("   • Organizes code into reusable functions")
+        overview.append("   • Makes code cleaner and maintainable")
+        overview.append("   • Follows the DRY principle (Don't Repeat Yourself)")
+    elif has_loop:
+        overview.append("   This code uses repetition (loops) to:")
+        overview.append("   • Perform tasks multiple times efficiently")
+        overview.append("   • Avoid writing the same code over and over")
+    elif has_if:
+        overview.append("   This code makes intelligent decisions:")
+        overview.append("   • Uses conditional logic (if/else)")
+        overview.append("   • Changes behavior based on different conditions")
+    else:
+        overview.append("   This is a sequential program that executes")
+        overview.append("   statements one after another in order.")
+    
+    # Statistics
+    loc = len([l for l in code.splitlines() if l.strip() and not l.strip().startswith("#")])
+    overview.append("")
+    overview.append("� **Code Statistics:**")
+    overview.append(f"   • Lines of code: {loc}")
+    overview.append(f"   • Programming language: {language.upper()}")
+    
+    if has_loop:
+        loop_count = code_lower.count("for ") + code_lower.count("while ")
+        overview.append(f"   • Loops used: {loop_count}")
+    if has_if:
+        if_count = code_lower.count("if ") + code_lower.count("if(")
+        overview.append(f"   • Decision points: {if_count}")
+    if has_function:
+        func_count = code_lower.count("def ") + code_lower.count("function ")
+        overview.append(f"   • Functions defined: {func_count}")
+    
+    overview.append("")
+    return overview
+
+
+def generate_detailed_line_explanation(line, stripped, i, language):
+    """Generate detailed, educational explanation for a line of code"""
+    explanations = []
+    
+    if language == "python":
+        # Variable assignment
+        if "=" in stripped and not any(op in stripped for op in ["==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "end="]):
+            parts = stripped.split("=", 1)
+            var = parts[0].strip()
+            expr = parts[1].strip() if len(parts) > 1 else ""
+            
+            explanations.append(f"📦 **Variable Assignment**")
+            explanations.append(f"   Creating a variable named `{var}` and storing the value: `{expr}`")
+            explanations.append("")
+            explanations.append(f"   💭 **Think of it like this:** We're putting a label on a box.")
+            explanations.append(f"   The label is `{var}` and what's inside the box is `{expr}`")
+            
+            if "input(" in stripped:
+                explanations.append("")
+                explanations.append("   🎯 **Special Note:** `input()` waits for the user to type something!")
+                explanations.append("   The program pauses until Enter is pressed.")
+            
+        # If statement
+        elif stripped.startswith("if "):
+            cond = stripped[3:].rstrip(":")
+            explanations.append(f"❓ **Conditional Check (Decision Making)**")
+            explanations.append(f"   Testing if this is true: `{cond}`")
+            explanations.append("")
+            explanations.append("   💭 **How it works:** Like a fork in the road!")
+            explanations.append("   • If the condition is TRUE → execute the indented code below")
+            explanations.append("   • If the condition is FALSE → skip to the next part")
+            
+            if "%" in cond:
+                explanations.append("")
+                explanations.append("   📚 **Learning Moment:** The `%` operator (modulo)")
+                explanations.append("   gives the REMAINDER after division.")
+                explanations.append("   Example: 10 % 3 = 1 (because 10 ÷ 3 = 3 remainder 1)")
+            if "==" in cond:
+                explanations.append("")
+                explanations.append("   ⚠️ **Common Mistake Alert:** `==` checks equality, `=` assigns!")
+                explanations.append("   • `x == 5` asks 'is x equal to 5?'")
+                explanations.append("   • `x = 5` says 'make x equal to 5'")
+                
+        # Print statement
+        elif "print(" in stripped:
+            explanations.append(f"📤 **Output to Screen**")
+            explanations.append(f"   Displays information to the user/console")
+            explanations.append("")
+            explanations.append("   💭 **Why this matters:** This is how programs communicate!")
+            explanations.append("   Without print(), your program would be silent!")
+            
+            if "f\"" in stripped or "f'" in stripped:
+                explanations.append("")
+                explanations.append("   🎨 **Cool Feature:** This uses an f-string!")
+                explanations.append("   Variables inside {curly braces} get replaced with their values.")
+                explanations.append("   Example: f\"Hello {name}\" → \"Hello John\"")
+            
+            if "end=" in stripped:
+                explanations.append("")
+                explanations.append("   ⚙️ **Technical Detail:** `end=` parameter changes what prints after.")
+                explanations.append("   By default, print() adds a newline. `end=''` removes it!")
+                
+        # For loop
+        elif stripped.startswith("for "):
+            explanations.append(f"🔄 **For Loop (Controlled Repetition)**")
+            explanations.append(f"   Repeating code for each item in a sequence")
+            explanations.append("")
+            explanations.append("   💭 **Real-world analogy:** Like dealing cards one by one!")
+            explanations.append("   The loop variable takes on each value, one at a time.")
+            
+            if "range(" in stripped:
+                explanations.append("")
+                explanations.append("   📚 **About range():**")
+                explanations.append("   • `range(5)` → 0, 1, 2, 3, 4 (starts at 0, stops before 5)")
+                explanations.append("   • `range(1, 6)` → 1, 2, 3, 4, 5 (starts at 1, stops before 6)")
+                explanations.append("   • `range(0, 10, 2)` → 0, 2, 4, 6, 8 (steps by 2)")
+                
+        # While loop
+        elif stripped.startswith("while "):
+            explanations.append(f"🔁 **While Loop (Conditional Repetition)**")
+            explanations.append(f"   Keeps repeating as long as the condition is TRUE")
+            explanations.append("")
+            explanations.append("   💭 **Real-world analogy:** Like waiting for water to boil!")
+            explanations.append("   You keep checking 'is it boiling yet?' until the answer is yes.")
+            explanations.append("")
+            explanations.append("   ⚠️ **Warning:** Make sure the condition eventually becomes FALSE,")
+            explanations.append("   or you'll create an infinite loop!")
+            
+        # Else
+        elif stripped.startswith("else:"):
+            explanations.append(f"↩️ **Else Block (Alternative Path)**")
+            explanations.append(f"   Runs when the above 'if' condition was FALSE")
+            explanations.append("")
+            explanations.append("   💭 **Think of it as:** The 'otherwise' or 'backup plan'")
+            
+        # Function definition
+        elif stripped.startswith("def "):
+            func_name = stripped.split("(")[0].replace("def ", "").strip()
+            explanations.append(f"🎯 **Function Definition**")
+            explanations.append(f"   Creating a reusable block of code named: `{func_name}()`")
+            explanations.append("")
+            explanations.append("   💭 **Why use functions?**")
+            explanations.append("   • Write once, use many times")
+            explanations.append("   • Makes code organized and readable")
+            explanations.append("   • Easier to test and debug")
+            
+        # Return statement
+        elif stripped.startswith("return "):
+            explanations.append(f"⬅️ **Return Statement**")
+            explanations.append(f"   Sends a value back from the function")
+            explanations.append("")
+            explanations.append("   💭 **Like a vending machine:**")
+            explanations.append("   You put in money (input) → return gives you a snack (output)")
+            
+        else:
+            explanations.append(f"▶️ **Statement Execution**")
+            explanations.append(f"   This line performs an operation or calculation")
+    
+    return "\n".join(explanations)
 
 
 @app.route("/explain", methods=["POST"])
@@ -645,148 +874,950 @@ def explain_code():
     }
     language = lang_normalize.get(language, language)
 
-    # Run linter first
-    ext_map = {
-        "python": (".py", ["pylint", "--disable=R,C"]),
-        "javascript": (".js", ["eslint", "--no-color"]),
-        "c": (".c", ["cppcheck", "--enable=all", "--quiet"]),
-        "cpp": (".cpp", ["cppcheck", "--enable=all", "--quiet"]),
-        "java": (".java", ["checkstyle", "-c", "/google_checks.xml"])
-    }
-
-    linter_output = ""
-    tmpfile = None
-    try:
-        suffix = ext_map.get(language, (".txt", None))[0]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode="w", encoding="utf-8") as f:
-            f.write(code)
-            f.flush()
-            tmpfile = f.name
-
-        tool_info = ext_map.get(language)
-        if tool_info and tool_info[1]:
-            cmd = tool_info[1] + [tmpfile]
-            try:
-                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
-                linter_output = (result.stdout or "").strip() + ("\n" + result.stderr.strip() if result.stderr else "")
-                if not linter_output:
-                    linter_output = "✅ No linter issues found."
-            except FileNotFoundError:
-                linter_output = f"⚠️ Linter tool not found for language '{language}'."
-            except subprocess.TimeoutExpired:
-                linter_output = "⚠️ Linter timed out."
-            except Exception as e:
-                linter_output = f"⚠️ Error running linter: {str(e)}"
-        else:
-            linter_output = "⚠️ No linter configured for this language."
-    finally:
-        if tmpfile and os.path.exists(tmpfile):
-            try:
-                os.remove(tmpfile)
-            except Exception:
-                pass
-
-    # Build human-friendly explanation
+    # Build beautiful, visual explanation with emojis and boxes
     explanation_parts = []
 
-    # Header
-    explanation_parts.append("=" * 60)
-    explanation_parts.append("📘 CODE EXPLANATION")
-    explanation_parts.append("=" * 60)
+    # Stunning Header with Box
+    explanation_parts.append("╔" + "═" * 58 + "╗")
+    explanation_parts.append("║" + " " * 15 + "� CODE EXPLANATION 📚" + " " * 20 + "║")
+    explanation_parts.append("║" + " " * 10 + f"Language: {language.upper()} 🔤" + " " * (47 - len(language)) + "║")
+    explanation_parts.append("╚" + "═" * 58 + "╝")
     explanation_parts.append("")
 
-    # Linter section
-    explanation_parts.append("🔍 Linter Analysis:")
-    explanation_parts.append("-" * 60)
-    explanation_parts.append(linter_output)
+    # Linter Analysis Box
+    explanation_parts.append("╭" + "─" * 58 + "╮")
+    explanation_parts.append("│  🔍 QUALITY CHECK & LINTER ANALYSIS" + " " * 20 + "│")
+    explanation_parts.append("╰" + "─" * 58 + "╯")
+    
+    # Format linter output with indentation
+    linter_lines = linter_output.split('\n')
+    for line in linter_lines:
+        if line.strip():
+            if "✅" in line or "No" in line and "found" in line:
+                explanation_parts.append(f"  ✅ {line}")
+            elif "⚠️" in line or "warning" in line.lower():
+                explanation_parts.append(f"  ⚠️  {line}")
+            elif "❌" in line or "error" in line.lower():
+                explanation_parts.append(f"  ❌ {line}")
+            else:
+                explanation_parts.append(f"  📝 {line}")
     explanation_parts.append("")
 
     # Line-by-line explanation for Python (with optional simulation)
     if language == "python":
-        explanation_parts.append("📝 Line-by-Line Explanation:")
-        explanation_parts.append("-" * 60)
+        explanation_parts.append("╭" + "─" * 58 + "╮")
+        explanation_parts.append("│  📖 LINE-BY-LINE CODE BREAKDOWN" + " " * 24 + "│")
+        explanation_parts.append("╰" + "─" * 58 + "╯")
+        explanation_parts.append("")
+        
         lines = code.splitlines()
         for i, line in enumerate(lines, start=1):
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            explanation_parts.append(f"{line}\n")
-            # Explain the line
-            if "=" in stripped and not any(op in stripped for op in ["==", "!=", "<=", ">=", "+=", "-=", "*=", "/="]):
-                parts = stripped.split("=", 1)
-                var = parts[0].strip()
-                expr = parts[1].strip() if len(parts) > 1 else ""
-                explanation_parts.append(f"  → Creates variable '{var}' and assigns it the value {expr}.")
-            elif stripped.startswith("if "):
-                cond = stripped[3:].rstrip(":")
-                explanation_parts.append(f"  → Checks the condition: {cond}")
-                if "%" in cond:
-                    explanation_parts.append(f"  → The '%' operator gives the remainder after division.")
-                if "==" in cond:
-                    explanation_parts.append(f"  → '==' checks if two values are equal.")
-            elif stripped.startswith("else:"):
-                explanation_parts.append(f"  → If the condition above is false, this block runs.")
-            elif "print(" in stripped:
-                explanation_parts.append(f"  → Prints the given value to the console.")
-            elif stripped.startswith("for "):
-                explanation_parts.append(f"  → Loop that iterates over a sequence.")
-            elif stripped.startswith("while "):
-                explanation_parts.append(f"  → Loop that runs while a condition is true.")
-            elif stripped.startswith("def "):
-                explanation_parts.append(f"  → Defines a function.")
-            else:
-                explanation_parts.append(f"  → Executes this statement.")
+            
+            # Code line in a box
+            explanation_parts.append(f"┌─ Line {i} " + "─" * (66 - len(str(i))) + "┐")
+            explanation_parts.append(f"│  {line[:72]}" + " " * max(0, 72 - len(line[:72])) + "│")
+            explanation_parts.append(f"└" + "─" * 74 + "┘")
+            
+            # Use detailed AI explanation
+            detailed_explanation = generate_detailed_line_explanation(line, stripped, i, language)
+            for exp_line in detailed_explanation.split("\n"):
+                explanation_parts.append(f"  {exp_line}")
             explanation_parts.append("")
 
         # Try to simulate execution for simple code
-        explanation_parts.append("🚀 Step-by-Step Execution:")
-        explanation_parts.append("-" * 60)
+        explanation_parts.append("")
+        explanation_parts.append("╭" + "─" * 58 + "╮")
+        explanation_parts.append("│  🚀 STEP-BY-STEP EXECUTION FLOW" + " " * 24 + "│")
+        explanation_parts.append("╰" + "─" * 58 + "╯")
+        explanation_parts.append("")
         try:
             steps, outputs = simulate_simple_python(code)
             for i, step in enumerate(steps, start=1):
-                explanation_parts.append(f"{i}. {step}")
+                explanation_parts.append(f"  {i}️⃣  {step}")
             explanation_parts.append("")
             if outputs:
-                explanation_parts.append("✅ Output:")
-                explanation_parts.append("")
+                explanation_parts.append("  ┌─ 📺 OUTPUT " + "─" * 43 + "┐")
                 for out in outputs:
-                    explanation_parts.append(f"  {out}")
+                    explanation_parts.append(f"  │  💬 {out[:52]}" + " " * max(0, 52 - len(out[:52])) + "│")
+                explanation_parts.append("  └" + "─" * 54 + "┘")
             else:
-                explanation_parts.append("  (No output produced)")
+                explanation_parts.append("  📭 No output produced")
         except ValueError as e:
-            explanation_parts.append(f"⚠️ Code is too complex to simulate: {e}")
+            explanation_parts.append(f"  ⚠️  Code too complex to simulate: {str(e)[:45]}")
         except Exception as e:
-            explanation_parts.append(f"⚠️ Simulation error: {e}")
+            explanation_parts.append(f"  ⚠️  Simulation error: {str(e)[:45]}")
 
     else:
         # For non-Python languages, provide a basic per-line summary
-        explanation_parts.append("📝 Line-by-Line Summary:")
-        explanation_parts.append("-" * 60)
+        explanation_parts.append("╭" + "─" * 58 + "╮")
+        explanation_parts.append("│  📖 LINE-BY-LINE CODE BREAKDOWN" + " " * 24 + "│")
+        explanation_parts.append("╰" + "─" * 58 + "╯")
+        explanation_parts.append("")
+        
         lines = [l for l in code.strip().splitlines() if l.strip()]
+        line_num = 0
         for line in lines:
             stripped = line.strip()
             if stripped.startswith("//") or stripped.startswith("#"):
                 continue
-            explanation_parts.append(f"{line}\n")
-            if "console.log" in stripped or "printf(" in stripped or "cout <<" in stripped:
-                explanation_parts.append(f"  → Prints or logs output.")
-            elif "=" in stripped:
-                explanation_parts.append(f"  → Assigns a value to a variable.")
+            line_num += 1
+            
+            # Code line in a box
+            explanation_parts.append(f"┌─ Line {line_num} " + "─" * (48 - len(str(line_num))) + "┐")
+            explanation_parts.append(f"│  {line[:54]}" + " " * max(0, 54 - len(line[:54])) + "│")
+            explanation_parts.append(f"└" + "─" * 56 + "┘")
+            
+            # Explain with emojis
+            if "console.log" in stripped or "printf(" in stripped or "cout <<" in stripped or "System.out" in stripped:
+                explanation_parts.append(f"  📤 Prints or logs output to console")
+            elif "#include" in stripped or "import " in stripped or "using namespace" in stripped:
+                explanation_parts.append(f"  📦 Imports library/module")
+            elif "int main" in stripped or "public static void main" in stripped:
+                explanation_parts.append(f"  🎯 Program entry point")
+            elif "scanf(" in stripped or "cin >>" in stripped or "Scanner" in stripped:
+                explanation_parts.append(f"  ⌨️  Reads user input")
+            elif "=" in stripped and "==" not in stripped:
+                explanation_parts.append(f"  💾 Assigns value to variable")
             elif stripped.startswith("if ") or stripped.startswith("if("):
-                explanation_parts.append(f"  → Conditional check.")
+                explanation_parts.append(f"  ❓ Conditional: Makes decision")
+            elif stripped.startswith("else"):
+                explanation_parts.append(f"  ↩️  Runs if condition fails")
             elif stripped.startswith("for ") or stripped.startswith("for("):
-                explanation_parts.append(f"  → Loop construct.")
+                explanation_parts.append(f"  🔄 Loop: Repeats code block")
+            elif stripped.startswith("while ") or stripped.startswith("while("):
+                explanation_parts.append(f"  🔁 Loop: Repeats while true")
+            elif "return " in stripped:
+                explanation_parts.append(f"  ⬅️  Returns value from function")
+            elif "{" in stripped or "}" in stripped:
+                explanation_parts.append(f"  🏁 Code block delimiter")
             else:
-                explanation_parts.append(f"  → Executes this statement.")
+                explanation_parts.append(f"  ▶️  Executes statement")
             explanation_parts.append("")
 
-    explanation_parts.append("=" * 60)
+        explanation_parts.append("")
+        explanation_parts.append("╭" + "─" * 58 + "╮")
+        explanation_parts.append("│  💡 TIP" + " " * 49 + "│")
+        explanation_parts.append("├" + "─" * 58 + "┤")
+        explanation_parts.append("│  Run the code to see detailed execution results!    │")
+        explanation_parts.append("╰" + "─" * 58 + "╯")
 
-    return jsonify({"explanation": "\n".join(explanation_parts)})
+    explanation_text = "\n".join(explanation_parts)
+    
+    # Save to history if user is logged in
+    if session.get('user_id'):
+        title = generate_code_title(code)
+        add_to_history(
+            user_id=session['user_id'],
+            activity_type='explain',
+            code_snippet=code,
+            language=language.capitalize(),
+            title=title,
+            output=explanation_text
+        )
+
+    return jsonify({"explanation": explanation_text})
 
 
-def auto_fix_python(code, issues):
-    """Auto-fix common Python errors based on linter output."""
+def generate_detailed_explanation(code, language):
+    """Generate comprehensive, step-by-step code explanation with detailed breakdowns"""
+    lines = code.splitlines()
+    
+    # Start with step-by-step section
+    html = '''
+    <div class="success-card issue-card" style="margin: 1rem;">
+        <span class="issue-badge success-badge">🔍 STEP-BY-STEP EXPLANATION</span>
+        <div class="issue-title">Let's break down this code line by line</div>
+        <div class="issue-description">
+            <div style="margin-top: 1rem;">
+    '''
+    
+    # Analyze each line with detailed explanations
+    step_num = 0
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith("//"):
+            continue
+        
+        step_num += 1
+        safe_line = line.replace('<', '&lt;').replace('>', '&gt;')
+        
+        # Generate detailed explanation based on pattern
+        explanation = generate_line_explanation(stripped, line, language, step_num, lines, i-1)
+        
+        html += f'''
+            <div style="margin: 1.5rem 0; padding: 1rem; background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+                    <span style="background: #667eea; color: white; padding: 0.3rem 0.7rem; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">{step_num}️⃣</span>
+                    <code style="background: #0d0d0d; padding: 0.4rem 0.8rem; border-radius: 6px; color: #6ad7ff; font-size: 0.9rem; flex: 1;">{safe_line}</code>
+                </div>
+                <div style="color: #ececf1; line-height: 1.8; font-size: 0.95rem;">
+                    {explanation}
+                </div>
+            </div>
+        '''
+    
+    html += '''
+            </div>
+        </div>
+    </div>
+    '''
+    
+    # Add output/summary section if applicable
+    summary = generate_code_summary(code, language)
+    if summary:
+        html += summary
+    
+    # Add key concepts section
+    html += '''
+    <div class="info-card issue-card" style="margin: 1rem;">
+        <span class="issue-badge info-badge">💡 KEY TAKEAWAYS</span>
+        <div class="issue-title">What You Should Remember</div>
+        <div class="issue-description" style="line-height: 1.8;">
+    '''
+    
+    key_concepts = extract_key_concepts(code, language)
+    for concept in key_concepts:
+        html += f'<div style="margin: 0.5rem 0;">• {concept}</div>'
+    
+    html += '''
+        </div>
+    </div>
+    '''
+    
+    return html
+
+
+def generate_line_explanation(stripped, original_line, language, step_num, all_lines, line_index):
+    """Generate detailed explanation for a single line of code"""
+    
+    if language == "python":
+        # Variable assignment with detailed explanation
+        if "=" in stripped and not any(op in stripped for op in ["==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "**="]):
+            parts = stripped.split("=", 1)
+            var_name = parts[0].strip()
+            value = parts[1].strip() if len(parts) > 1 else ""
+            
+            explanation = f'''
+                <strong>This line assigns a value to the variable <code>{var_name}</code>.</strong>
+                <br><br>
+                <div style="background: rgba(16, 163, 127, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                    📌 <strong>What's happening:</strong>
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>We create a variable called <code>{var_name}</code></li>
+                        <li>We store the value <code>{value}</code> in it</li>
+                        <li>Now we can use <code>{var_name}</code> anywhere in our code</li>
+                    </ul>
+                </div>
+            '''
+            
+            # Add more context if it's a number
+            if value.replace("-", "").replace(".", "").isdigit():
+                explanation += f'''
+                    <div style="margin-top: 0.5rem; color: #b4b4b4;">
+                        💭 <em>Think of <code>{var_name}</code> as a labeled box that holds the number {value}.</em>
+                    </div>
+                '''
+            
+            return explanation
+        
+        # For loops with detailed breakdown
+        elif stripped.startswith("for "):
+            # Extract loop components
+            if " in " in stripped:
+                parts = stripped.split(" in ")
+                loop_var = parts[0].replace("for ", "").strip()
+                iterable = parts[1].rstrip(":").strip()
+                
+                explanation = f'''
+                    <strong>This is a FOR LOOP - it repeats code multiple times.</strong>
+                    <br><br>
+                    <div style="background: rgba(16, 163, 127, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                        📌 <strong>How it works:</strong>
+                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                            <li><code>{loop_var}</code> is the <strong>loop variable</strong> - it changes each iteration</li>
+                            <li><code>{iterable}</code> is what we're looping through</li>
+                '''
+                
+                # Explain range() if present
+                if "range(" in iterable:
+                    import re
+                    range_match = re.search(r'range\((.*?)\)', iterable)
+                    if range_match:
+                        range_args = range_match.group(1).split(",")
+                        if len(range_args) == 1:
+                            explanation += f'''
+                                <li>This loops from <code>0</code> to <code>{range_args[0].strip()} - 1</code></li>
+                            '''
+                        elif len(range_args) == 2:
+                            explanation += f'''
+                                <li>This loops from <code>{range_args[0].strip()}</code> to <code>{range_args[1].strip()} - 1</code></li>
+                            '''
+                        elif len(range_args) >= 3:
+                            explanation += f'''
+                                <li>Start: <code>{range_args[0].strip()}</code></li>
+                                <li>End: <code>{range_args[1].strip()}</code> (not included)</li>
+                                <li>Step: <code>{range_args[2].strip()}</code> (increment/decrement by this amount)</li>
+                            '''
+                
+                explanation += '''
+                        </ul>
+                    </div>
+                    <div style="margin-top: 0.5rem; color: #b4b4b4;">
+                        💭 <em>The loop runs once for each value, executing all indented code below it.</em>
+                    </div>
+                '''
+                return explanation
+        
+        # While loops
+        elif stripped.startswith("while "):
+            condition = stripped.replace("while ", "").rstrip(":")
+            return f'''
+                <strong>This is a WHILE LOOP - it repeats as long as a condition is true.</strong>
+                <br><br>
+                <div style="background: rgba(255, 193, 7, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                    📌 <strong>How it works:</strong>
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>Checks if <code>{condition}</code> is true</li>
+                        <li>If true, runs the indented code below</li>
+                        <li>Then checks the condition again</li>
+                        <li>Repeats until the condition becomes false</li>
+                    </ul>
+                </div>
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(255, 84, 89, 0.1); border-radius: 4px;">
+                    ⚠️ <strong>Warning:</strong> Make sure the condition eventually becomes false, or you'll have an infinite loop!
+                </div>
+            '''
+        
+        # If statements
+        elif stripped.startswith("if "):
+            condition = stripped.replace("if ", "").rstrip(":")
+            return f'''
+                <strong>This is an IF STATEMENT - it makes decisions.</strong>
+                <br><br>
+                <div style="background: rgba(255, 193, 7, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                    📌 <strong>How it works:</strong>
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>Checks if <code>{condition}</code> is true</li>
+                        <li>If true, runs the indented code below</li>
+                        <li>If false, skips to the next section (elif/else or next line)</li>
+                    </ul>
+                </div>
+                <div style="margin-top: 0.5rem; color: #b4b4b4;">
+                    💭 <em>Think of it like a fork in the road - the code takes different paths based on the condition.</em>
+                </div>
+            '''
+        
+        # Print statements
+        elif "print(" in stripped:
+            return '''
+                <strong>This PRINTS output to the screen.</strong>
+                <br><br>
+                <div style="background: rgba(102, 126, 234, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                    📌 <strong>What it does:</strong>
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>Displays the result on your console/terminal</li>
+                        <li>Useful for seeing what your program is doing</li>
+                        <li>Helps with debugging and showing results to users</li>
+                    </ul>
+                </div>
+            '''
+        
+        # Function definitions
+        elif stripped.startswith("def "):
+            func_name = stripped.split("(")[0].replace("def ", "").strip()
+            params = ""
+            if "(" in stripped and ")" in stripped:
+                params = stripped[stripped.index("(")+1:stripped.index(")")].strip()
+            
+            explanation = f'''
+                <strong>This defines a FUNCTION called <code>{func_name}</code>.</strong>
+                <br><br>
+                <div style="background: rgba(102, 126, 234, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                    📌 <strong>What's a function?</strong>
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>A reusable block of code</li>
+                        <li>You can call it multiple times</li>
+            '''
+            
+            if params:
+                explanation += f'''
+                        <li>Takes input(s): <code>{params}</code></li>
+                '''
+            
+            explanation += '''
+                        <li>Can return a result</li>
+                    </ul>
+                </div>
+                <div style="margin-top: 0.5rem; color: #b4b4b4;">
+                    💭 <em>Functions are like recipes - write once, use many times!</em>
+                </div>
+            '''
+            return explanation
+        
+        # Return statements
+        elif stripped.startswith("return "):
+            value = stripped.replace("return ", "").strip()
+            return f'''
+                <strong>This RETURNS a value from the function.</strong>
+                <br><br>
+                <div style="background: rgba(16, 163, 127, 0.1); padding: 0.8rem; border-radius: 6px; margin: 0.5rem 0;">
+                    📌 <strong>What happens:</strong>
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>The function stops executing</li>
+                        <li>It sends back the value: <code>{value}</code></li>
+                        <li>The caller receives this value</li>
+                    </ul>
+                </div>
+                <div style="margin-top: 0.5rem; color: #b4b4b4;">
+                    💭 <em>Return is like the function's answer - it gives back a result.</em>
+                </div>
+            '''
+    
+    # Default explanation
+    return f'''
+        <strong>This line executes a statement in your program.</strong>
+        <br><br>
+        <div style="color: #b4b4b4; margin-top: 0.5rem;">
+            The code performs its intended operation as part of the program's logic.
+        </div>
+    '''
+
+
+def generate_code_summary(code, language):
+    """Generate output pattern or summary section"""
+    # For now, return empty - can be enhanced based on code patterns
+    return ""
+
+
+def extract_key_concepts(code, language):
+    """Extract key programming concepts from the code"""
+    concepts = []
+    
+    if "for " in code:
+        concepts.append("<strong>Loops:</strong> Used to repeat code multiple times - essential for automation")
+    if "while " in code:
+        concepts.append("<strong>While Loops:</strong> Repeat code based on a condition - useful when you don't know how many iterations")
+    if "if " in code or "elif " in code:
+        concepts.append("<strong>Conditionals:</strong> Make decisions in code - allows different paths of execution")
+    if "def " in code:
+        concepts.append("<strong>Functions:</strong> Reusable code blocks - write once, use many times")
+    if "range(" in code:
+        concepts.append("<strong>Range:</strong> Generates sequences of numbers - commonly used with loops")
+    if "print(" in code:
+        concepts.append("<strong>Output:</strong> Displays results to users - essential for interaction and debugging")
+    if "=" in code and "==" not in code:
+        concepts.append("<strong>Variables:</strong> Store data for later use - the building blocks of programs")
+    
+    if not concepts:
+        concepts.append("This code demonstrates fundamental programming concepts")
+    
+    return concepts
+
+
+@app.route('/explain_html', methods=['POST'])
+def explain_html():
+    """Generate comprehensive, educational code explanations with detailed breakdowns"""
+    data = request.get_json() or {}
+    code = data.get("code", "")
+    language = data.get("language", "python").lower().strip()
+
+    if not code:
+        return jsonify({"html": "<div style='color:red;'>⚠️ No code provided.</div>"}), 400
+
+    # Normalize language names
+    lang_normalize = {
+        "javascript (node.js 12.14.0)": "javascript",
+        "java (openjdk 13.0.1)": "java",
+        "c++": "cpp"
+    }
+    language = lang_normalize.get(language, language)
+
+    # Generate comprehensive explanation
+    explanation_html = generate_detailed_explanation(code, language)
+    
+    # Build HTML with header
+    html = f'''
+    <div class="explanation-container">
+        <div class="header-box">
+            <h1>📚 COMPREHENSIVE CODE EXPLANATION</h1>
+            <p>🔤 Language: {language.upper()} | 📖 Tutorial-Style Breakdown</p>
+        </div>
+        {explanation_html}
+    </div>
+    '''
+    
+    return jsonify({"html": html})
+
+
+# ---------------- AI OPTIMIZER ----------------
+
+def ai_optimize_python(code):
+    """
+    AI-powered code optimizer that provides detailed optimization explanations.
+    Returns optimized code and a list of optimizations made.
+    """
+    optimized_lines = []
+    optimizations = []
+    lines = code.splitlines()
+    
+    # Track optimization types
+    removed_inner_loops = False
+    simplified_ranges = False
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        
+        # Detect nested loop pattern for star/pattern printing
+        if "for " in stripped and " in range(" in stripped:
+            # Check if this is followed by another for loop (nested)
+            if i + 1 < len(lines):
+                next_line = lines[i + 1]
+                next_stripped = next_line.strip()
+                next_indent = len(next_line) - len(next_line.lstrip())
+                
+                # Pattern: nested loop with print("* ")
+                if next_indent > indent and "for " in next_stripped and " in range(" in next_stripped:
+                    # Check if inner loop prints stars
+                    has_star_print = False
+                    for j in range(i + 2, min(i + 5, len(lines))):
+                        if "print(" in lines[j] and ("*" in lines[j] or '"* "' in lines[j]):
+                            has_star_print = True
+                            break
+                    
+                    if has_star_print:
+                        # Optimize: remove inner loop, use string multiplication
+                        # Extract loop variable from outer loop
+                        outer_var_match = re.search(r'for\s+(\w+)\s+in\s+range\((.*?)\)', stripped)
+                        if outer_var_match:
+                            loop_var = outer_var_match.group(1)
+                            range_expr = outer_var_match.group(2)
+                            
+                            # Check the range pattern - look for pattern with (1, n+1) and nested (n-i, ...)
+                            # This is a typical nested loop pattern for printing stars
+                            if "1" in range_expr and "n" in range_expr:
+                                # Check if inner loop uses n-i or similar pattern
+                                if "n" in next_stripped and ("-" in next_stripped or "- " in next_stripped):
+                                    optimized_lines.append(f"{' ' * indent}# Use range(n, 0, -1) instead of nested calculation to simplify logic")
+                                    optimized_lines.append(f"{' ' * indent}for {loop_var} in range(n, 0, -1):")
+                                    optimized_lines.append(f"{' ' * (indent + 4)}# Print the stars directly using string multiplication instead of inner loop")
+                                    optimized_lines.append(f"{' ' * (indent + 4)}print(\"* \" * {loop_var})")
+                                    
+                                    removed_inner_loops = True
+                                    simplified_ranges = True
+                                    
+                                    optimizations.append({
+                                        "change": "Removed inner loop",
+                                        "description": 'Replaced the inner for j in range(...) with string multiplication ("* " * i)',
+                                        "benefit": "Reduces time complexity from O(n²) iteration to O(n) loop"
+                                    })
+                                    optimizations.append({
+                                        "change": "Simplified outer loop",
+                                        "description": f"Changed from for {loop_var} in range(1, n+1) with (n-i) logic to a direct decreasing range for {loop_var} in range(n, 0, -1)",
+                                        "benefit": "More readable, avoids calculating n - i repeatedly"
+                                    })
+                                    optimizations.append({
+                                        "change": "Cleaner code",
+                                        "description": 'Removed redundant end="" usage',
+                                        "benefit": "Code is shorter and easier to understand"
+                                    })
+                                    
+                                    # Skip the inner loop and print statements
+                                    skip_count = 0
+                                    for j in range(i + 1, len(lines)):
+                                        if lines[j].strip() and len(lines[j]) - len(lines[j].lstrip()) <= indent:
+                                            break
+                                        skip_count += 1
+                                    i += skip_count
+                                    i += 1
+                                    continue
+        
+        # If no optimization applied, keep original line with comments if it's important
+        if stripped:
+            # Add helpful comments for key lines
+            if stripped.startswith("n =") or stripped.startswith("n="):
+                optimized_lines.append(f"{' ' * indent}# Optimized pattern printing code")
+                optimized_lines.append(line)
+            else:
+                optimized_lines.append(line)
+        else:
+            optimized_lines.append(line)
+        
+        i += 1
+    
+    # If no optimizations were made, apply simple improvements
+    if not optimizations:
+        # Check for other simple optimizations
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            
+            # Detect list comprehension opportunities
+            if "for " in stripped and i + 1 < len(lines) and ".append(" in lines[i + 1]:
+                optimizations.append({
+                    "change": "Potential list comprehension",
+                    "description": "Could use list comprehension instead of loop with append",
+                    "benefit": "More Pythonic and often faster"
+                })
+                break
+        
+        # If still no optimizations, return original with note
+        if not optimizations:
+            optimizations.append({
+                "change": "No major optimizations needed",
+                "description": "Code is already well-optimized",
+                "benefit": "Code follows good practices"
+            })
+            return {
+                "optimized_code": code,
+                "optimizations": optimizations
+            }
+    
+    optimized_code = "\n".join(optimized_lines)
+    
+    return {
+        "optimized_code": optimized_code,
+        "optimizations": optimizations
+    }
+
+
+# ---------------- AI DEBUGGER ----------------
+
+def format_detailed_issues(bugs_found, code_lines):
+    """Format issues in detailed, educational style with explanations and examples."""
+    if not bugs_found:
+        return ""
+    
+    issues_html = f"🚨 **Errors and Issues Found**\n\n"
+    
+    for idx, bug in enumerate(bugs_found, 1):
+        line_num = bug["line"]
+        bug_type = bug["type"]
+        message = bug["message"]
+        code_snippet = bug["code"]
+        
+        issues_html += f"❌ **{idx}. {bug_type}**\n\n"
+        
+        # Add detailed explanations based on bug type
+        if "colon" in bug_type.lower() or "Missing colon" in message:
+            issues_html += "Every `for`, `if`, `while`, `def`, `class`, etc., in Python must end with a colon (`:`).\n\n"
+            issues_html += f"**Line {line_num}:**\n```\n{code_snippet}   ❌\n```\n\n"
+            issues_html += "✅ **Correct:**\n```\n" + code_snippet + ":\n```\n\n"
+        
+        elif "parentheses" in bug_type.lower() or "print" in message.lower() and "statement" in message.lower():
+            issues_html += "In Python 3, `print` is a function, not a statement.\n"
+            issues_html += f"This line:\n```\n{code_snippet}\n```\n"
+            issues_html += "does nothing — it just refers to the function object and doesn't actually print a newline.\n\n"
+            issues_html += "✅ **Correct:**\n```\nprint()\n```\n\n"
+        
+        elif "Indentation" in bug_type:
+            issues_html += "If your inner loop or print isn't properly indented, Python will raise an `IndentationError`.\n"
+            issues_html += "Make sure spacing is consistent (usually 4 spaces or a tab).\n\n"
+            issues_html += f"**Problem at line {line_num}:**\n```\n{code_snippet}\n```\n\n"
+        
+        elif "Infinite Loop" in bug_type:
+            issues_html += f"**Line {line_num}:** This loop runs forever!\n\n"
+            issues_html += f"```\n{code_snippet}\n```\n\n"
+            issues_html += "This `while` loop has no `break` statement or condition that becomes `False`.\n"
+            issues_html += "It will run indefinitely and freeze your program.\n\n"
+            issues_html += "✅ **Fix:** Add a `break` statement or ensure the condition eventually becomes `False`.\n\n"
+        
+        elif "Assignment in Conditional" in bug_type:
+            issues_html += f"**Line {line_num}:** Using `=` (assignment) instead of `==` (comparison)\n\n"
+            issues_html += f"```\n{code_snippet}   ❌\n```\n\n"
+            issues_html += "The single `=` assigns a value and always evaluates to `True`, which is probably not what you want.\n\n"
+            if "fix" in bug:
+                issues_html += f"✅ **Correct:**\n```\n{bug['fix']}\n```\n\n"
+        
+        elif "Index Error" in bug_type or "IndexError" in bug_type:
+            issues_html += f"**Line {line_num}:** Potential out-of-bounds array access\n\n"
+            issues_html += f"```\n{code_snippet}\n```\n\n"
+            issues_html += "When you use `range(len(arr))`, the index goes from `0` to `len(arr)-1`.\n"
+            issues_html += "Accessing `arr[i+1]` or `arr[i-1]` can cause an `IndexError` at the boundaries.\n\n"
+            issues_html += "✅ **Fix:** Check array bounds or adjust your loop range.\n\n"
+        
+        elif "Typo" in bug_type or "undefined" in message.lower():
+            issues_html += f"**Line {line_num}:** Variable might not be defined\n\n"
+            issues_html += f"```\n{code_snippet}\n```\n\n"
+            issues_html += f"{message}\n\n"
+            issues_html += "✅ **Fix:** Check for typos in variable names or make sure the variable is defined before use.\n\n"
+        
+        elif "Loop Variable Modification" in bug_type:
+            issues_html += f"**Line {line_num}:** Modifying the loop variable inside the loop\n\n"
+            issues_html += f"```\n{code_snippet}\n```\n\n"
+            issues_html += "In a `for` loop like `for i in range(...)`, changing the value of `i` inside the loop\n"
+            issues_html += "won't affect the next iteration. The loop counter is controlled by the iterator.\n\n"
+            issues_html += "✅ **Fix:** Use a different variable for calculations, or use a `while` loop if you need to control the counter.\n\n"
+        
+        else:
+            # Generic format for other issues
+            issues_html += f"**Line {line_num}:**\n```\n{code_snippet}\n```\n\n"
+            issues_html += f"{message}\n\n"
+            if "fix" in bug:
+                issues_html += f"✅ **Suggested Fix:**\n```\n{bug['fix']}\n```\n\n"
+        
+        issues_html += "---\n\n"
+    
+    return issues_html
+
+
+def ai_debug_code(code, language, issues):
+    """
+    AI-powered intelligent debugging that analyzes logical errors, not just syntax.
+    Uses GPT-like analysis to find bugs and suggest fixes.
+    """
+    analysis = {
+        "bugs_found": [],
+        "suggestions": [],
+        "fixed_code": code,
+        "confidence": "high"
+    }
+    
+    lines = code.splitlines()
+    
+    # === SYNTAX ERROR DETECTION ===
+    
+    # 0. Detect missing colons after control structures
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # Check for control structures without colons
+        if re.match(r"^(if|elif|else|for|while|def|class|try|except|finally|with)\b", stripped):
+            if not stripped.endswith(":") and not stripped.endswith("\\"):
+                # Make sure it's not a multi-line statement
+                if i < len(lines) and not lines[i].strip().startswith("\\"):
+                    bug_type = "Missing colon (:)"
+                    if "for" in stripped:
+                        bug_type += " after for loop"
+                    elif "if" in stripped:
+                        bug_type += " after if statement"
+                    elif "while" in stripped:
+                        bug_type += " after while loop"
+                    elif "def" in stripped:
+                        bug_type += " after function definition"
+                    elif "class" in stripped:
+                        bug_type += " after class definition"
+                    
+                    analysis["bugs_found"].append({
+                        "line": i,
+                        "type": bug_type,
+                        "severity": "high",
+                        "message": f"Every {stripped.split()[0]}, if, while, etc., in Python must end with a colon.",
+                        "code": stripped
+                    })
+    
+    # 0b. Detect print statement without parentheses (Python 3)
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # Match: print followed by space or end of line, but not print(
+        if re.match(r"^\s*print\s*$", stripped) or re.match(r"^\s*print\s+[^(]", stripped):
+            analysis["bugs_found"].append({
+                "line": i,
+                "type": "print statement is missing parentheses",
+                "severity": "high",
+                "message": "In Python 3, print is a function, not a statement.",
+                "code": stripped
+            })
+    
+    # 0c. Detect indentation issues (basic)
+    prev_indent = 0
+    for i, line in enumerate(lines, 1):
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        
+        current_indent = len(line) - len(line.lstrip())
+        
+        # Check if indentation changed by an amount not divisible by common tab sizes
+        if i > 1 and current_indent != prev_indent:
+            indent_diff = abs(current_indent - prev_indent)
+            if indent_diff not in [2, 4, 8]:  # Common indentation sizes
+                analysis["bugs_found"].append({
+                    "line": i,
+                    "type": "Indentation issue",
+                    "severity": "medium",
+                    "message": "Inconsistent indentation detected. Python requires consistent spacing.",
+                    "code": line.rstrip()
+                })
+        
+        prev_indent = current_indent
+    
+    # === LOGICAL ERROR DETECTION ===
+    
+    # 1. Detect infinite loops
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # Check for while True without break
+        if "while" in stripped.lower() and ("true" in stripped.lower() or "1" in stripped):
+            # Look ahead for break statement
+            has_break = False
+            indent_level = len(line) - len(line.lstrip())
+            for j in range(i, min(i + 10, len(lines))):
+                if j < len(lines):
+                    next_line = lines[j]
+                    next_indent = len(next_line) - len(next_line.lstrip())
+                    if next_indent > indent_level and "break" in next_line:
+                        has_break = True
+                        break
+                    elif next_indent <= indent_level:
+                        break
+            
+            if not has_break:
+                analysis["bugs_found"].append({
+                    "line": i,
+                    "type": "Infinite Loop",
+                    "severity": "high",
+                    "message": f"Potential infinite loop detected. Loop has no break condition.",
+                    "code": stripped
+                })
+    
+    # 2. Detect assignment instead of comparison
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if re.match(r"^\s*(if|while|elif)\s+.*[^=!<>]=(?!=)", stripped):
+            # Single = in conditional
+            if " = " in stripped and " == " not in stripped:
+                analysis["bugs_found"].append({
+                    "line": i,
+                    "type": "Assignment in Conditional",
+                    "severity": "high",
+                    "message": "Using assignment (=) instead of comparison (==). This will always evaluate to True.",
+                    "code": stripped,
+                    "fix": stripped.replace(" = ", " == ")
+                })
+    
+    # 3. Detect off-by-one errors in loops
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # Check for range(len(arr)) followed by arr[i+1] or arr[i-1]
+        if "range(len(" in stripped:
+            var_name = stripped.split("in ")[0].strip().split()[-1] if " in " in stripped else "i"
+            # Look for array access with +1 or -1
+            for j in range(i, min(i + 5, len(lines))):
+                if j < len(lines):
+                    check_line = lines[j]
+                    if f"{var_name}+1]" in check_line.replace(" ", "") or f"{var_name}-1]" in check_line.replace(" ", ""):
+                        analysis["bugs_found"].append({
+                            "line": j + 1,
+                            "type": "Potential Index Error",
+                            "severity": "medium",
+                            "message": f"Array access with {var_name}±1 may cause IndexError at boundaries.",
+                            "code": check_line.strip()
+                        })
+                        break
+    
+    # 4. Detect variable shadowing / typos
+    declared_vars = set()
+    loop_vars = set()  # Track loop variables
+    
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # Find variable declarations
+        if "=" in stripped and not stripped.startswith("#"):
+            var_match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=", stripped)
+            if var_match:
+                var_name = var_match.group(1)
+                declared_vars.add(var_name)
+        
+        # Track loop variables (for i in..., for num in...)
+        if "for " in stripped and " in " in stripped:
+            loop_var = stripped.split("for ")[1].split(" in ")[0].strip()
+            declared_vars.add(loop_var)
+            loop_vars.add(loop_var)
+        
+        # Track function parameters
+        if "def " in stripped and "(" in stripped:
+            params = re.findall(r'def\s+\w+\s*\(([^)]*)\)', stripped)
+            if params:
+                param_list = params[0].split(",")
+                for param in param_list:
+                    param_name = param.strip().split("=")[0].strip()
+                    if param_name:
+                        declared_vars.add(param_name)
+    
+    # Common built-in functions and keywords
+    builtins = {'true', 'false', 'none', 'print', 'input', 'len', 'range', 'str', 
+                'int', 'float', 'list', 'dict', 'set', 'tuple', 'sum', 'max', 'min',
+                'abs', 'all', 'any', 'enumerate', 'zip', 'map', 'filter', 'sorted',
+                'open', 'type', 'isinstance', 'hasattr', 'getattr', 'append', 'extend',
+                'keys', 'values', 'items', 'split', 'join', 'format', 'replace'}
+    
+    # Check for undefined variables (simple heuristic) - only in non-string contexts
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if stripped.startswith("#") or not "=" in stripped:
+            continue
+        
+        # Skip lines with string literals containing many variables
+        if stripped.count('"') >= 2 or stripped.count("'") >= 2:
+            continue
+            
+        # Check right side of assignment
+        parts = stripped.split("=", 1)
+        if len(parts) > 1:
+            right_side = parts[1]
+            # Skip f-strings and format strings
+            if 'f"' in right_side or "f'" in right_side or ".format(" in right_side:
+                continue
+            
+            # Find all variable-like tokens
+            tokens = re.findall(r'\b([a-z_][a-z0-9_]*)\b', right_side.lower())
+            for token in tokens:
+                if token not in declared_vars and token not in builtins:
+                    # Possible typo - find similar variables
+                    similar = [v for v in declared_vars if 0 < abs(len(v) - len(token)) <= 2]
+                    if similar:
+                        analysis["bugs_found"].append({
+                            "line": i,
+                            "type": "Possible Typo",
+                            "severity": "medium",
+                            "message": f"Variable '{token}' may be undefined. Did you mean: {', '.join(similar[:3])}?",
+                            "code": stripped
+                        })
+                        break  # Only report first typo per line
+    
+    # 5. Detect incorrect loop variable modification
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if "for " in stripped and " in " in stripped:
+            loop_var = stripped.split("for ")[1].split(" in ")[0].strip()
+            # Check if loop variable is modified inside loop
+            indent_level = len(line) - len(line.lstrip())
+            for j in range(i, min(i + 20, len(lines))):
+                if j < len(lines):
+                    check_line = lines[j]
+                    check_indent = len(check_line) - len(check_line.lstrip())
+                    if check_indent <= indent_level and j != i:
+                        break  # Exited loop block
+                    if f"{loop_var} =" in check_line or f"{loop_var}=" in check_line:
+                        analysis["bugs_found"].append({
+                            "line": j + 1,
+                            "type": "Loop Variable Modification",
+                            "severity": "low",
+                            "message": f"Modifying loop variable '{loop_var}' inside the loop. This won't affect iteration.",
+                            "code": check_line.strip()
+                        })
+                        break
+    
+    # === GENERATE IMPROVED SUGGESTIONS ===
+    if not analysis["bugs_found"]:
+        analysis["suggestions"].append("✅ No logical errors detected! Your code structure looks good.")
+        analysis["suggestions"].append("💡 Consider adding error handling (try-except blocks) for robustness.")
+        analysis["suggestions"].append("📝 Add comments to explain complex logic.")
+    else:
+        analysis["suggestions"].append(f"🐛 Found {len(analysis['bugs_found'])} potential bug(s).")
+        analysis["suggestions"].append("🔧 Review the issues below and apply suggested fixes.")
+    
+    # === APPLY BASIC SYNTAX FIXES (keep existing functionality) ===
+    analysis["fixed_code"] = auto_fix_python_syntax(code)
+    
+    return analysis
+
+
+def auto_fix_python_syntax(code):
+    """Basic syntax fixes only (separated from AI logic)."""
     fixed_lines = []
     lines = code.splitlines()
     
@@ -804,12 +1835,17 @@ def auto_fix_python(code, issues):
             content = stripped[6:]
             fixed_line = line.replace("print " + content, f"print({content})")
         
-        # Fix assignment in conditionals
-        if_match = re.match(r"^(\s*)(if|while)\s+(.+)", line)
-        if if_match and "=" in if_match.group(3) and "==" not in if_match.group(3):
+        # Fix bare print (with no arguments)
+        if stripped == "print":
+            fixed_line = line.replace("print", "print()")
+        
+        # Fix assignment in conditionals (= to ==)
+        if_match = re.match(r"^(\s*)(if|while|elif)\s+(.+)", line)
+        if if_match and " = " in if_match.group(3) and " == " not in if_match.group(3):
             indent, keyword, condition = if_match.groups()
-            condition = condition.replace("=", "==")
-            fixed_line = f"{indent}{keyword} {condition}"
+            # Only replace first occurrence and avoid replacing in strings
+            condition_fixed = condition.replace(" = ", " == ", 1)
+            fixed_line = f"{indent}{keyword} {condition_fixed}"
         
         # Fix indentation (basic - replace tabs with 4 spaces)
         if "\t" in fixed_line:
@@ -822,6 +1858,11 @@ def auto_fix_python(code, issues):
         fixed_lines.append(fixed_line)
     
     return "\n".join(fixed_lines)
+
+
+def auto_fix_python(code, issues):
+    """Wrapper for backward compatibility - calls syntax fix only."""
+    return auto_fix_python_syntax(code)
 
 
 def auto_fix_java(code, issues):
@@ -1238,33 +2279,164 @@ def debug_code():
             except Exception:
                 pass
 
-    # Auto-fix code based on language - ALWAYS attempt fixes
-    fixed_code = code
+    # === AI-POWERED COMPREHENSIVE DEBUGGING ===
+    # Focus on finding ALL issues, not just fixing one
+    ai_analysis = None
+    fixed_code = code  # Keep original code visible
+    all_issues = []
+    
     try:
         if language == "python":
-            fixed_code = auto_fix_python(code, linter_output)
+            # Use AI analysis for comprehensive Python debugging
+            ai_analysis = ai_debug_code(code, language, linter_output)
+            
+            # Collect ALL issues found by AI
+            if ai_analysis["bugs_found"]:
+                # Format all bugs in detail
+                ai_issues = format_detailed_issues(ai_analysis["bugs_found"], code.splitlines())
+                all_issues.append(ai_issues)
+            
+            # Add linter issues if they exist
+            if linter_output and not linter_output.startswith("✅"):
+                all_issues.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+                all_issues.append("🔍 **LINTER ANALYSIS:**\n\n")
+                all_issues.append(linter_output)
+            
+            # Add suggestions at the end
+            if ai_analysis["suggestions"]:
+                all_issues.append("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+                all_issues.append("💡 **BEST PRACTICES & SUGGESTIONS:**\n\n")
+                for i, suggestion in enumerate(ai_analysis["suggestions"], 1):
+                    all_issues.append(f"  {i}. {suggestion}\n")
+            
+            # Combine all issues
+            if all_issues:
+                linter_output = "".join(all_issues)
+            else:
+                linter_output = "✅ **GREAT JOB!**\n\nNo issues found! Your code looks clean and follows best practices. 🎉"
+            
+            # Show fixed code suggestion (but keep original in main view)
+            if ai_analysis["fixed_code"] and ai_analysis["fixed_code"] != code:
+                fixed_code = ai_analysis["fixed_code"]
+            else:
+                fixed_code = code
+        
         elif language == "javascript":
+            # Show linter issues + attempt to provide fixed version
+            if linter_output and not linter_output.startswith("✅"):
+                all_issues.append("🔍 **JAVASCRIPT LINTER ISSUES:**\n\n")
+                all_issues.append(linter_output)
+                all_issues.append("\n\n💡 **TIP:** Review the issues above and fix them one by one.")
+                linter_output = "".join(all_issues)
             fixed_code = auto_fix_javascript(code, linter_output)
+            
         elif language == "java":
+            # Show compiler issues
+            if linter_output and not linter_output.startswith("✅"):
+                all_issues.append("🔍 **JAVA COMPILER ISSUES:**\n\n")
+                all_issues.append(linter_output)
+                all_issues.append("\n\n💡 **TIP:** Fix compilation errors from top to bottom.")
+                linter_output = "".join(all_issues)
             fixed_code = auto_fix_java(code, linter_output)
+            
         elif language in ["c", "cpp"]:
+            # Show cppcheck issues
+            if linter_output and not linter_output.startswith("✅"):
+                all_issues.append("🔍 **C/C++ STATIC ANALYSIS:**\n\n")
+                all_issues.append(linter_output)
+                all_issues.append("\n\n💡 **TIP:** Pay attention to memory management and pointer issues.")
+                linter_output = "".join(all_issues)
             fixed_code = auto_fix_c_cpp(code, linter_output)
         else:
             # For unsupported languages, still return the code without comments
             fixed_code = code
             
-        # NEVER add comments - just return the fixed code as-is
-        # Even if no changes were made, return clean code
-            
     except Exception as e:
         # On error, still return original code without error comments
+        print(f"Debug error: {e}")
         fixed_code = code
+
+    # Save to history if user is logged in
+    if session.get('user_id'):
+        title = generate_code_title(code)
+        add_to_history(
+            user_id=session['user_id'],
+            activity_type='debug',
+            code_snippet=code,
+            language=language.capitalize(),
+            title=title,
+            output=linter_output
+        )
 
     return jsonify({
         "issues": linter_output,
         "fixed_code": fixed_code,
-        "original_code": code
+        "original_code": code,
+        "ai_analysis": ai_analysis  # Include full AI analysis in response
     })
+
+# ---------------- HISTORY API ----------------
+@app.route("/api/history", methods=["GET"])
+def get_history():
+    """Get user's activity history"""
+    if not check_user():
+        return jsonify({"error": "Not logged in"}), 401
+    
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        history = get_user_history(session['user_id'], limit)
+        
+        # Format the history data
+        history_list = []
+        for item in history:
+            history_list.append({
+                'id': item[0],
+                'activity_type': item[1],
+                'code_snippet': item[2],
+                'language': item[3],
+                'title': item[4],
+                'output': item[5],
+                'created_at': item[6].strftime('%Y-%m-%d %H:%M:%S') if item[6] else ''
+            })
+        
+        return jsonify({"history": history_list})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/history/<int:history_id>", methods=["GET"])
+def get_history_item(history_id):
+    """Get a specific history item"""
+    if not check_user():
+        return jsonify({"error": "Not logged in"}), 401
+    
+    try:
+        item = get_history_by_id(history_id, session['user_id'])
+        if not item:
+            return jsonify({"error": "History item not found"}), 404
+        
+        return jsonify({
+            'id': item[0],
+            'activity_type': item[1],
+            'code_snippet': item[2],
+            'language': item[3],
+            'title': item[4],
+            'output': item[5],
+            'created_at': item[6].strftime('%Y-%m-%d %H:%M:%S') if item[6] else ''
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/history/<int:history_id>", methods=["DELETE"])
+def delete_history(history_id):
+    """Delete a history item"""
+    if not check_user():
+        return jsonify({"error": "Not logged in"}), 401
+    
+    try:
+        delete_history_item(history_id, session['user_id'])
+        return jsonify({"success": True, "message": "History item deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)

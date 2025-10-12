@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CODEX - Code Execution Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        h2 {
+            color: #333;
+            font-size: 1.5em;
+        }
+        
+        .status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .status.pending {
+            background: #ffd700;
+            color: #333;
+        }
+        
+        .status.success {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .status.error {
+            background: #f44336;
+            color: white;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: transform 0.2s;
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .summary {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            margin-top: 30px;
+            font-size: 1.2em;
+        }
+        
+        .summary h2 {
+            color: white;
+            margin-bottom: 15px;
+        }
+        
+        .emoji {
+            font-size: 3em;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 CODEX Code Execution Test</h1>
+        <p class="subtitle">Click "Test All" to verify all language support is working</p>
+        
+        <button id="testAllBtn" onclick="testAll()">🧪 Test All Languages</button>
+        
+        <div id="python-test" class="test-section" style="display:none;">
+            <div class="test-header">
+                <h2>🐍 Python</h2>
+                <span class="status pending" id="python-status">⏳ Waiting</span>
+            </div>
+            <div class="output" id="python-output">No output yet...</div>
+        </div>
+        
+        <div id="c-test" class="test-section" style="display:none;">
+            <div class="test-header">
+                <h2>©️ C</h2>
+                <span class="status pending" id="c-status">⏳ Waiting</span>
+            </div>
+            <div class="output" id="c-output">No output yet...</div>
+        </div>
+        
+        <div id="cpp-test" class="test-section" style="display:none;">
+            <div class="test-header">
+                <h2>➕ C++</h2>
+                <span class="status pending" id="cpp-status">⏳ Waiting</span>
+            </div>
+            <div class="output" id="cpp-output">No output yet...</div>
+        </div>
+        
+        <div id="java-test" class="test-section" style="display:none;">
+            <div class="test-header">
+                <h2>☕ Java</h2>
+                <span class="status pending" id="java-status">⏳ Waiting</span>
+            </div>
+            <div class="output" id="java-output">No output yet...</div>
+        </div>
+        
+        <div id="js-test" class="test-section" style="display:none;">
+            <div class="test-header">
+                <h2>📜 JavaScript</h2>
+                <span class="status pending" id="js-status">⏳ Waiting</span>
+            </div>
+            <div class="output" id="js-output">No output yet...</div>
+        </div>
+        
+        <div id="summary" class="summary" style="display:none;">
+            <div class="emoji">🎉</div>
+            <h2>All Tests Complete!</h2>
+            <p id="summary-text"></p>
+        </div>
+    </div>
+    
+    <script>
+        async function runCode(code, languageId) {
+            const response = await fetch('http://127.0.0.1:5000/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code: code,
+                    language_id: languageId,
+                    stdin: ''
+                })
+            });
+            
+            const result = await response.json();
+            return result.output;
+        }
+        
+        async function testLanguage(name, code, languageId, expectedText) {
+            const section = document.getElementById(`${name}-test`);
+            const status = document.getElementById(`${name}-status`);
+            const output = document.getElementById(`${name}-output`);
+            
+            section.style.display = 'block';
+            status.textContent = '⏳ Running...';
+            output.textContent = 'Executing code...';
+            
+            try {
+                const result = await runCode(code, languageId);
+                output.textContent = result;
+                
+                if (result.includes(expectedText)) {
+                    status.textContent = '✅ Passed';
+                    status.className = 'status success';
+                    return true;
+                } else {
+                    status.textContent = '⚠️ Output mismatch';
+                    status.className = 'status error';
+                    return false;
+                }
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                status.textContent = '❌ Failed';
+                status.className = 'status error';
+                return false;
+            }
+        }
+        
+        async function testAll() {
+            document.getElementById('testAllBtn').disabled = true;
+            document.getElementById('summary').style.display = 'none';
+            
+            const results = {};
+            
+            // Test Python
+            results.python = await testLanguage(
+                'python',
+                'x = 15\ny = 25\nprint(f"Sum: {x + y}")\nprint("Python works!")',
+                71,
+                'Python works!'
+            );
+            
+            // Test C
+            results.c = await testLanguage(
+                'c',
+                '#include <stdio.h>\nint main() {\n    printf("C works!\\n");\n    printf("5 + 3 = %d\\n", 5 + 3);\n    return 0;\n}',
+                50,
+                'C works!'
+            );
+            
+            // Test C++
+            results.cpp = await testLanguage(
+                'cpp',
+                '#include <iostream>\nusing namespace std;\nint main() {\n    cout << "C++ works!" << endl;\n    cout << "10 * 2 = " << (10 * 2) << endl;\n    return 0;\n}',
+                54,
+                'C++ works!'
+            );
+            
+            // Test Java
+            results.java = await testLanguage(
+                'java',
+                'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Java works!");\n        System.out.println("7 * 7 = " + (7 * 7));\n    }\n}',
+                62,
+                'Java works!'
+            );
+            
+            // Test JavaScript
+            results.js = await testLanguage(
+                'js',
+                'console.log("JavaScript works!");\nconst x = 12;\nconst y = 8;\nconsole.log(`${x} + ${y} = ${x + y}`);',
+                63,
+                'JavaScript works!'
+            );
+            
+            // Show summary
+            const total = Object.keys(results).length;
+            const passed = Object.values(results).filter(r => r).length;
+            
+            document.getElementById('summary').style.display = 'block';
+            
+            if (passed === total) {
+                document.getElementById('summary-text').innerHTML = 
+                    `<strong>${passed}/${total} tests passed!</strong><br>✅ All language support is working perfectly!<br>🚀 Your CODEX is ready for production!`;
+            } else {
+                document.getElementById('summary-text').innerHTML = 
+                    `<strong>${passed}/${total} tests passed</strong><br>Some languages may need more time or have issues.`;
+            }
+            
+            document.getElementById('testAllBtn').disabled = false;
+        }
+    </script>
+</body>
+</html>

@@ -15,24 +15,188 @@ document.addEventListener("DOMContentLoaded", () => {
   const debugSection = document.getElementById("debugSection"); // might not exist
   const debugBox = document.getElementById("debugOutput"); // might not exist
 
-  // ---- RUN CODE ----
-  if (runBtn && resultSection && resultBox) {
+  // ---- RUN CODE ---- (Terminal-style with inline input)
+  if (runBtn && resultSection) {
     console.log("Run button listener attached successfully");
+    
+    const terminalOutput = document.getElementById("terminalOutput");
+    const terminalInputLine = document.getElementById("terminalInputLine");
+    const terminalInput = document.getElementById("terminalInput");
+    const inputPrompt = document.getElementById("inputPrompt");
+    
+    let userInputs = []; // Store all user inputs
+    let inputCount = 0; // Track how many inputs have been provided
+    let isWaitingForInput = false;
+    let inputPrompts = []; // Store extracted prompts from code
+    
     runBtn.addEventListener("click", async () => {
       console.log("Run button clicked!");
       const code = codeEditor.value.trim();
       const language_id = parseInt(languageSelect.value);
-      const inputBox = document.getElementById("inputBox");
-      const stdin = inputBox ? inputBox.value : "";
-
-      resultSection.classList.remove("hidden"); // show output section
+      
+      // Reset for new run
+      userInputs = [];
+      inputCount = 0;
+      isWaitingForInput = false;
+      inputPrompts = [];
+      
+      resultSection.classList.remove("hidden");
+      terminalInputLine.style.display = "none";
 
       if (!code) {
-        resultBox.textContent = "⚠️ Please write some code before running!";
+        terminalOutput.textContent = "⚠️ Please write some code before running!";
         return;
       }
 
-      resultBox.textContent = "⏳ Running your code...";
+      // Check if code needs input
+      const needsInput = detectInputRequired(code, language_id);
+      
+      if (needsInput) {
+        // Extract prompts from code
+        extractInputPrompts(code, language_id);
+        
+        // Start with first input prompt
+        terminalOutput.textContent = "";
+        const firstPrompt = inputPrompts[0] || "Enter input: ";
+        showInputPrompt(firstPrompt);
+      } else {
+        // Run normally without input
+        terminalOutput.textContent = "⏳ Running your code...";
+        await runCodeWithInputs(code, language_id, "");
+      }
+    });
+    
+    // Extract input prompts from code
+    function extractInputPrompts(code, language_id) {
+      inputPrompts = [];
+      
+      if (language_id === 71) { // Python
+        // Match input("prompt") patterns
+        const matches = code.matchAll(/input\s*\(\s*["']([^"']+)["']\s*\)/g);
+        for (const match of matches) {
+          inputPrompts.push(match[1]);
+        }
+      }
+      
+      // Default prompts if none extracted
+      if (inputPrompts.length === 0) {
+        const inputCount = countExpectedInputs(code, language_id);
+        for (let i = 0; i < inputCount; i++) {
+          inputPrompts.push("Enter input: ");
+        }
+      }
+    }
+    
+    // Handle Enter key in terminal input
+    if (terminalInput) {
+      terminalInput.addEventListener("keypress", async (event) => {
+        if (event.key === "Enter" && isWaitingForInput) {
+          const value = terminalInput.value;
+          
+          // Display what user typed (echo) on the same line as the prompt
+          const currentText = terminalOutput.textContent;
+          // Remove trailing space if present, add input value
+          if (currentText.endsWith(" ")) {
+            terminalOutput.textContent = currentText + value;
+          } else {
+            terminalOutput.textContent = currentText + value;
+          }
+          
+          // Store the input
+          userInputs.push(value);
+          inputCount++;
+          
+          // Clear input field
+          terminalInput.value = "";
+          
+          // Hide input line temporarily
+          terminalInputLine.style.display = "none";
+          isWaitingForInput = false;
+          
+          // Check if more inputs are needed
+          const code = codeEditor.value.trim();
+          const language_id = parseInt(languageSelect.value);
+          const expectedInputs = countExpectedInputs(code, language_id);
+          
+          if (inputCount < expectedInputs) {
+            // Show next prompt on new line
+            terminalOutput.textContent += "\n";
+            const nextPrompt = inputPrompts[inputCount] || "Enter input: ";
+            showInputPrompt(nextPrompt);
+          } else {
+            // All inputs collected, run the code
+            terminalOutput.textContent += "\n";
+            const stdin = userInputs.join("\n");
+            await runCodeWithInputs(code, language_id, stdin);
+          }
+        }
+      });
+    }
+    
+    // Show input prompt in terminal
+    function showInputPrompt(prompt) {
+      isWaitingForInput = true;
+      
+      // Add prompt to output with space (user will type on same line)
+      const currentText = terminalOutput.textContent;
+      // Add newline before prompt if there's already content
+      if (currentText && !currentText.endsWith("\n")) {
+        terminalOutput.textContent += "\n" + prompt + " ";
+      } else {
+        terminalOutput.textContent += prompt + " ";
+      }
+      
+      // Show input field inline
+      inputPrompt.textContent = "";
+      terminalInputLine.style.display = "block";
+      terminalInput.value = "";
+      terminalInput.focus();
+    }
+    
+    // Detect if code requires input
+    function detectInputRequired(code, language_id) {
+      const lowerCode = code.toLowerCase();
+      
+      // Python
+      if (language_id === 71 && (lowerCode.includes("input(") || lowerCode.includes("raw_input("))) {
+        return true;
+      }
+      // C/C++
+      if ((language_id === 50 || language_id === 54) && 
+          (lowerCode.includes("scanf(") || lowerCode.includes("cin >>") || lowerCode.includes("cin>>"))) {
+        return true;
+      }
+      // Java
+      if (language_id === 62 && (lowerCode.includes("scanner") || lowerCode.includes(".nextint(") || 
+          lowerCode.includes(".nextline(") || lowerCode.includes(".next("))) {
+        return true;
+      }
+      // JavaScript
+      if (language_id === 63 && lowerCode.includes("readline(")) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // Count expected inputs from code
+    function countExpectedInputs(code, language_id) {
+      let count = 0;
+      const lowerCode = code.toLowerCase();
+      
+      if (language_id === 71) { // Python
+        count = (code.match(/input\(/g) || []).length;
+      } else if (language_id === 50 || language_id === 54) { // C/C++
+        count = (code.match(/scanf\(/g) || []).length + (code.match(/cin\s*>>/g) || []).length;
+      } else if (language_id === 62) { // Java
+        count = (code.match(/\.next\w*\(/g) || []).length;
+      }
+      
+      return count;
+    }
+    
+    // Run code with given stdin
+    async function runCodeWithInputs(code, language_id, stdin) {
       try {
         const response = await fetch("/run", {
           method: "POST",
@@ -42,11 +206,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const data = await response.json();
         console.log("Run response:", data);
-        resultBox.textContent = data.output || "⚠️ No output returned.";
+        
+        let output = data.output || "⚠️ No output returned.";
+        
+        // Filter out input prompts from the output (they're already shown interactively)
+        if (language_id === 71 && inputPrompts.length > 0) {
+          // Remove all the prompts that we already displayed
+          inputPrompts.forEach(prompt => {
+            // Remove the prompt text from output
+            output = output.replace(prompt, '');
+          });
+          
+          // Clean up any extra whitespace or newlines at the start
+          output = output.trim();
+        }
+        
+        // Display the final output
+        if (output) {
+          terminalOutput.textContent += output;
+        }
+        
+        // Check if output contains errors
+        const hasError = output.includes("Error") || 
+                        output.includes("Traceback") || 
+                        output.includes("Exception") ||
+                        output.includes("SyntaxError") ||
+                        output.includes("NameError") ||
+                        output.includes("TypeError") ||
+                        output.includes("IndexError") ||
+                        output.includes("ValueError");
+        
+        if (hasError) {
+          // Store the error for debugging
+          localStorage.setItem("runtimeError", output);
+          localStorage.setItem("errorCode", code);
+          localStorage.setItem("errorLanguage", languageSelect.options[languageSelect.selectedIndex].text);
+          
+          // Show helpful message
+          terminalOutput.textContent += "\n\n💡 Tip: Click the 🪲 Debug button to analyze and fix these errors!";
+        } else {
+          // Clear any previous errors
+          localStorage.removeItem("runtimeError");
+          localStorage.removeItem("errorCode");
+          localStorage.removeItem("errorLanguage");
+        }
+        
+        // Hide input line after code completes
+        terminalInputLine.style.display = "none";
+        
       } catch (err) {
-        resultBox.textContent = "❌ Error: " + err.message;
+        terminalOutput.textContent += "\n❌ Error: " + err.message;
+        terminalInputLine.style.display = "none";
+        
+        // Store network/fetch error for debugging
+        localStorage.setItem("runtimeError", err.message);
+        localStorage.setItem("errorCode", code);
+        localStorage.setItem("errorLanguage", languageSelect.options[languageSelect.selectedIndex].text);
       }
-    });
+    }
   }
 
   // ---- EXPLAIN CODE ----
@@ -238,7 +455,8 @@ document.addEventListener("DOMContentLoaded", () => {
       explanationBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">💡 Analyzing your code...<br>⏳ Please wait...</div>';
 
       try {
-        const resp = await fetch("/explain", {
+        // Try the new colorful HTML endpoint first
+        const resp = await fetch("/explain_html", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code, language: languageValue })
@@ -247,27 +465,47 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
         const data = await resp.json();
 
-        // If server reports that linter is missing, fall back to local generator
-        if (data.explanation && /Linter tool not found|No linter configured/.test(data.explanation)) {
-          const localExplanation = generateExplanation(code, languageText);
-          explanationBox.innerHTML = formatExplanation(localExplanation) + 
-            '<div class="explanation-card" style="border-left-color: #ffc107;"><div class="explanation-title">⚠️ Note</div><div class="explanation-content">' + 
-            escapeHtml(data.explanation) + '</div></div>';
-          return;
-        }
-
-        // Prefer server-provided explanation (structured + linter output)
-        if (data.explanation) {
-          explanationBox.innerHTML = formatExplanation(data.explanation);
+        // Display the beautiful colorful HTML
+        if (data.html) {
+          explanationBox.innerHTML = data.html;
         } else {
-          const localExplanation = generateExplanation(code, languageText);
-          explanationBox.innerHTML = formatExplanation(localExplanation);
+          throw new Error("No HTML returned from server");
         }
       } catch (err) {
-        // Fallback: use local generator
-        const localExplanation = generateExplanation(code, languageText);
-        explanationBox.innerHTML = '<div class="explanation-card" style="border-left-color: #ff5459;"><div class="explanation-title">⚠️ Server Unavailable</div><div class="explanation-content">Using local explanation generator.</div></div>' + 
-          formatExplanation(localExplanation);
+        console.log("Colorful endpoint failed, trying fallback...", err);
+        // Fallback to plain text endpoint
+        try {
+          const resp = await fetch("/explain", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, language: languageValue })
+          });
+
+          if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+          const data = await resp.json();
+
+          // If server reports that linter is missing, fall back to local generator
+          if (data.explanation && /Linter tool not found|No linter configured/.test(data.explanation)) {
+            const localExplanation = generateExplanation(code, languageText);
+            explanationBox.innerHTML = formatExplanation(localExplanation) + 
+              '<div class="explanation-card" style="border-left-color: #ffc107;"><div class="explanation-title">⚠️ Note</div><div class="explanation-content">' + 
+              escapeHtml(data.explanation) + '</div></div>';
+            return;
+          }
+
+          // Prefer server-provided explanation (structured + linter output)
+          if (data.explanation) {
+            explanationBox.innerHTML = formatExplanation(data.explanation);
+          } else {
+            const localExplanation = generateExplanation(code, languageText);
+            explanationBox.innerHTML = formatExplanation(localExplanation);
+          }
+        } catch (err2) {
+          // Final fallback: use local generator
+          const localExplanation = generateExplanation(code, languageText);
+          explanationBox.innerHTML = '<div class="explanation-card" style="border-left-color: #ff5459;"><div class="explanation-title">⚠️ Server Unavailable</div><div class="explanation-content">Using local explanation generator.</div></div>' + 
+            formatExplanation(localExplanation);
+        }
       }
     });
   }
@@ -284,9 +522,20 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // Check if there's a runtime error stored
+      const runtimeError = localStorage.getItem("runtimeError");
+      const errorCode = localStorage.getItem("errorCode");
+      
       // Store code and language in localStorage
       localStorage.setItem("debugCode", code);
       localStorage.setItem("debugLanguage", languageText);
+      
+      // If there's no matching runtime error, clear old ones
+      if (!runtimeError || errorCode !== code) {
+        localStorage.removeItem("runtimeError");
+        localStorage.removeItem("errorCode");
+        localStorage.removeItem("errorLanguage");
+      }
       
       // Navigate to debug page
       window.location.href = "/debugger";
@@ -527,4 +776,182 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
+  // ---- HISTORY MANAGEMENT ----
+  const historyList = document.getElementById("historyList");
+  const searchBox = document.getElementById("searchBox");
+
+  let allHistory = [];
+
+  // Load history from server
+  async function loadHistory() {
+    try {
+      const response = await fetch('/api/history?limit=100');
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('Error loading history:', data.error);
+        return;
+      }
+      
+      allHistory = data.history || [];
+      displayHistory(allHistory);
+    } catch (err) {
+      console.error('Error loading history:', err);
+    }
+  }
+
+  // Display history items
+  function displayHistory(items) {
+    if (!historyList) return;
+
+    if (items.length === 0) {
+      historyList.innerHTML = '<p style="font-size:0.85rem;color:#777;padding:1rem;">No history yet...</p>';
+      return;
+    }
+
+    historyList.innerHTML = items.map(item => {
+      const icon = {
+        'run': '▶️',
+        'debug': '🪲',
+        'optimize': '⚙️',
+        'explain': '💡'
+      }[item.activity_type] || '📝';
+
+      const date = new Date(item.created_at);
+      const timeAgo = getTimeAgo(date);
+
+      return `
+        <div class="history-item" data-id="${item.id}">
+          <div style="display:flex;justify-content:space-between;align-items:start;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+                <span>${icon}</span>
+                <span style="font-weight:600;font-size:0.9rem;color:#fff;">${item.activity_type.toUpperCase()}</span>
+                <span style="font-size:0.75rem;color:#888;">${item.language}</span>
+              </div>
+              <div style="font-size:0.85rem;color:#ececf1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                ${escapeHtml(item.title)}
+              </div>
+              <div style="font-size:0.75rem;color:#666;margin-top:0.2rem;">${timeAgo}</div>
+            </div>
+            <button onclick="deleteHistoryItem(${item.id})" 
+                    style="background:transparent;border:none;color:#ff4444;cursor:pointer;padding:0.2rem 0.5rem;font-size:1.2rem;margin-left:0.5rem;"
+                    title="Delete">×</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers to load history items
+    document.querySelectorAll('.history-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') return; // Don't load if delete button clicked
+        const id = item.dataset.id;
+        loadHistoryItem(id);
+      });
+    });
+  }
+
+  // Load a specific history item
+  async function loadHistoryItem(id) {
+    try {
+      const response = await fetch(`/api/history/${id}`);
+      const data = await response.json();
+      
+      if (data.error) {
+        alert('Error loading history item: ' + data.error);
+        return;
+      }
+
+      // Load the code into editor
+      codeEditor.value = data.code_snippet;
+      
+      // Set language
+      const languageMap = {
+        'Python': '71',
+        'C': '50',
+        'C++': '54',
+        'Javascript': '63',
+        'Java': '62'
+      };
+      languageSelect.value = languageMap[data.language] || '71';
+      
+      // Update UI
+      updateLineNumbers();
+      updateSyntaxHighlight();
+      
+      // Show output if available
+      if (data.output && resultBox && resultSection) {
+        resultBox.textContent = data.output;
+        resultSection.classList.remove('hidden');
+      }
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      alert('Error loading history: ' + err.message);
+    }
+  }
+
+  // Delete history item
+  window.deleteHistoryItem = async function(id) {
+    if (!confirm('Delete this history item?')) return;
+
+    try {
+      const response = await fetch(`/api/history/${id}`, {
+        method: 'DELETE'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reload history
+        loadHistory();
+      } else {
+        alert('Error deleting: ' + data.error);
+      }
+    } catch (err) {
+      alert('Error deleting history: ' + err.message);
+    }
+  };
+
+  // Search history
+  if (searchBox) {
+    searchBox.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      
+      if (!query) {
+        displayHistory(allHistory);
+        return;
+      }
+
+      const filtered = allHistory.filter(item => 
+        item.title.toLowerCase().includes(query) ||
+        item.code_snippet.toLowerCase().includes(query) ||
+        item.language.toLowerCase().includes(query) ||
+        item.activity_type.toLowerCase().includes(query)
+      );
+
+      displayHistory(filtered);
+    });
+  }
+
+  // Helper function for time ago
+  function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
+    
+    return date.toLocaleDateString();
+  }
+
+  // Load history on page load
+  loadHistory();
+
+  // Refresh history every 30 seconds
+  setInterval(loadHistory, 30000);
 });

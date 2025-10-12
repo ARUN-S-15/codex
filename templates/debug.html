@@ -137,6 +137,8 @@
       border: none;
       tab-size: 4;
       z-index: 0;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
     
     .syntax-highlight code {
@@ -146,13 +148,15 @@
       background: transparent !important;
       padding: 0 !important;
       margin: 0 !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
     }
 
    /* Line numbers */
    .line-numbers {
       background: #2a2b32;
       color: #9ca3af;
-      padding: 1rem 0.5rem;
+      padding: 1rem 0.8rem;
       text-align: right;
       font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
       font-size: 1.1rem;
@@ -161,6 +165,9 @@
       white-space: pre;
       line-height: 1.7rem;
       overflow: hidden;
+      min-width: 50px;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
 
     textarea {
@@ -182,6 +189,8 @@
       z-index: 1;
       white-space: pre-wrap;
       word-wrap: break-word;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
     
     textarea::placeholder {
@@ -634,8 +643,17 @@
       return;
     }
 
+    // Check for runtime error from compiler
+    const runtimeError = localStorage.getItem("runtimeError");
+    const errorCode = localStorage.getItem("errorCode");
+    
     // Show loading state
-    issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">🐞 Analyzing your code with linters...<br>⏳ Please wait...</div>';
+    let loadingMessage = '🐞 Analyzing your code with linters...<br>⏳ Please wait...';
+    if (runtimeError && errorCode === codeToAnalyze) {
+      loadingMessage = '🔥 Analyzing runtime error...<br>⏳ Please wait...';
+    }
+    
+    issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">' + loadingMessage + '</div>';
     codeInput.value = "⏳ Auto-fixing errors...\n\nPlease wait while we analyze and debug your code...";
     results.style.display = "flex";
     historyBox.style.display = "none";
@@ -672,12 +690,45 @@
       console.log("Issues text type:", typeof issuesText);
       console.log("Issues text length:", issuesText.length);
       
+      let finalIssuesHTML = '';
+      
+      // Check if there's a runtime error to display
+      const runtimeError = localStorage.getItem("runtimeError");
+      const errorCode = localStorage.getItem("errorCode");
+      
+      if (runtimeError && errorCode === codeToAnalyze) {
+        // Display the runtime error prominently at the top
+        finalIssuesHTML = `
+          <div class="issue-card" style="border-left: 5px solid #ff0000; background: linear-gradient(135deg, #2a0a0a 0%, #1a1a1a 100%);">
+            <span class="issue-badge" style="background: #ff0000; color: white; font-weight: bold;">🔥 RUNTIME ERROR</span>
+            <div class="issue-title" style="color: #ff6b6b; font-size: 1.2em; margin-top: 0.5rem;">Your Code Crashed During Execution</div>
+            <div class="issue-description" style="margin-top: 0.8rem;">
+              <strong>What happened:</strong><br>
+              Your code ran but encountered an error and stopped. Here's what went wrong:
+            </div>
+            <pre class="issue-code" style="background: #1a1a1a; border: 1px solid #ff0000; padding: 1rem; margin-top: 1rem; border-radius: 6px; overflow-x: auto; color: #ff6b6b; font-family: 'Courier New', monospace; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(runtimeError)}</pre>
+            <div class="issue-description" style="margin-top: 1rem; border-top: 1px solid #333; padding-top: 1rem;">
+              <strong>💡 How to fix it:</strong><br>
+              The detailed analysis below will help you understand and fix this error. Look for the specific line mentioned in the error message and check the suggestions.
+            </div>
+          </div>
+          <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #333;">
+            <div style="color: #10a37f; font-weight: bold; margin-bottom: 1rem; font-size: 1.1em;">📋 Detailed Analysis:</div>
+          </div>
+        `;
+        
+        // Clear the stored error after displaying
+        localStorage.removeItem("runtimeError");
+        localStorage.removeItem("errorCode");
+        localStorage.removeItem("errorLanguage");
+      }
+      
       if (!issuesText || issuesText.trim() === '') {
-        issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #888;">No issues data received from server.</div>';
+        issuesBox.innerHTML = finalIssuesHTML + '<div style="padding: 2rem; text-align: center; color: #888;">No issues data received from server.</div>';
       } else {
         const formattedIssues = formatIssues(issuesText);
         console.log("Formatted issues HTML length:", formattedIssues.length);
-        issuesBox.innerHTML = formattedIssues;
+        issuesBox.innerHTML = finalIssuesHTML + formattedIssues;
       }
 
     } catch (err) {

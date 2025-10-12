@@ -146,20 +146,22 @@
       -webkit-text-fill-color: transparent;
       word-wrap: break-word;
       white-space: pre-wrap;
-      letter-spacing: normal;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
     .line-numbers {
       background: #2a2b32;
       color: #9ca3af;
-      padding: 1rem 0.5rem;
+      padding: 1rem 0.8rem;
       text-align: right;
-      font-family: monospace;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
       font-size: 1.3rem;
       border-radius: 5px 0 0 5px;
       user-select: none;
       white-space: pre;
       line-height: 1.95rem;
       overflow: hidden;
+      min-width: 50px;
     }
     .editor-container {
       display: flex;
@@ -198,7 +200,8 @@
       border: none;
       tab-size: 4;
       z-index: 0;
-      letter-spacing: normal;
+      letter-spacing: 0;
+      word-spacing: 0;
     }
     
     .syntax-highlight code {
@@ -208,8 +211,8 @@
       background: transparent !important;
       padding: 0 !important;
       margin: 0 !important;
-      letter-spacing: normal !important;
-      word-spacing: normal !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
     }
     
     #codeEditor {
@@ -375,6 +378,255 @@
       background: #2a2b32;
     }
     
+    /* Colorful Grid Box Explanation Styles - Match Debug Page Issue Cards */
+    .explanation-container { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #202123;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    
+    /* Issues Grid Layout */
+    .issues-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin: 1rem 0;
+    }
+    @media (max-width: 900px) {
+      .issues-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .header-box {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    .header-box h1 { margin: 0; font-size: 28px; }
+    .header-box p { margin: 10px 0 0 0; opacity: 0.95; font-size: 16px; }
+    .section-box {
+      background: #40414f;
+      border: 2px solid #565869;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .section-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ececf1;
+      margin: 0 0 15px 0;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #565869;
+    }
+    
+    /* Issue Card Styles - Same as Debug Page */
+    .issue-card {
+      background: linear-gradient(135deg, rgba(255, 84, 89, 0.1) 0%, rgba(255, 84, 89, 0.05) 100%);
+      border-left: 4px solid #ff5459;
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      margin: 1rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease;
+    }
+    
+    .issue-card:hover {
+      transform: translateX(4px);
+    }
+    
+    .warning-card {
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
+      border-left-color: #ffc107;
+    }
+    
+    .success-card {
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.15) 0%, rgba(16, 163, 127, 0.05) 100%);
+      border-left-color: #10a37f;
+    }
+    
+    .issue-badge {
+      display: inline-block;
+      padding: 0.3rem 0.7rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+    }
+    
+    .error-badge {
+      background: #ff5459;
+      color: #fff;
+    }
+    
+    .warning-badge {
+      background: #ffc107;
+      color: #000;
+    }
+    
+    .success-badge {
+      background: #10a37f;
+      color: #fff;
+    }
+    
+    .info-badge {
+      background: #667eea;
+      color: #fff;
+    }
+    
+    .info-card {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(102, 126, 234, 0.05) 100%);
+      border-left-color: #667eea;
+    }
+    
+    .issue-title {
+      color: #ececf1;
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0.5rem 0;
+      line-height: 1.4;
+    }
+    
+    .issue-description {
+      color: #b4b4b4;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-top: 0.5rem;
+    }
+    
+    .issue-code {
+      background: #0d0d0d;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 0.5rem 0.8rem;
+      margin-top: 0.5rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.85rem;
+      color: #6ad7ff;
+      overflow-x: auto;
+    }
+    
+    /* Legacy styles for backward compatibility */
+    .linter-success {
+      background: rgba(16, 163, 127, 0.2);
+      border-left: 4px solid #10a37f;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      color: #10a37f;
+    }
+    .linter-warning {
+      background: rgba(255, 193, 7, 0.2);
+      border-left: 4px solid #ffc107;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      color: #ffc107;
+    }
+    .linter-error {
+      background: rgba(255, 84, 89, 0.2);
+      border-left: 4px solid #ff5459;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      color: #ff5459;
+    }
+    .linter-info {
+      background: rgba(106, 215, 255, 0.2);
+      border-left: 4px solid #6ad7ff;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 4px;
+      color: #6ad7ff;
+    }
+    .code-line-box {
+      background: #2a2b32;
+      border: 1px solid #565869;
+      border-left: 4px solid #667eea;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 12px 0;
+      transition: all 0.2s;
+    }
+    .code-line-box:hover {
+      border-left-width: 6px;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      background: #353740;
+    }
+    .code-line-header {
+      color: #667eea;
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .code-line-content {
+      background: #1d1d1d;
+      padding: 10px;
+      border-radius: 4px;
+      color: #ececf1;
+      font-family: 'Courier New', Consolas, monospace;
+      font-size: 14px;
+      overflow-x: auto;
+    }
+    .explanation-text {
+      color: #9ca3af;
+      margin-top: 8px;
+      padding-left: 10px;
+      line-height: 1.6;
+    }
+    .explanation-text span {
+      display: block;
+      margin: 4px 0;
+    }
+    .explanation-text strong {
+      color: #ececf1;
+    }
+    .explanation-text code {
+      background: #1d1d1d;
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #6ad7ff;
+      font-family: 'Courier New', monospace;
+    }
+    .execution-step {
+      background: linear-gradient(to right, #2a2b32, #40414f);
+      border-left: 3px solid #10a37f;
+      padding: 10px 15px;
+      margin: 8px 0;
+      border-radius: 4px;
+    }
+    .output-box {
+      background: #0d0d0d;
+      color: #00ff00;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      margin: 15px 0;
+      border: 2px solid #565869;
+    }
+    .output-title {
+      color: #6ad7ff;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .tip-box {
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.2) 0%, rgba(255, 193, 7, 0.1) 100%);
+      border: 2px solid #ffc107;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+      color: #ffc107;
+      font-weight: 500;
+    }
+    
     /* Input box specific styling */
     #inputBox {
       background: #2a2b32 !important;
@@ -429,15 +681,7 @@
         </div>
       </div>
       
-      <!-- Input Section for User Input -->
-      <div style="margin-top:1rem;">
-        <label for="inputBox" style="display:block;margin-bottom:0.5rem;font-weight:bold;color:#ececf1;">
-          📝 Input (for programs that need user input like input(), scanf(), Scanner, etc.):
-        </label>
-        <textarea id="inputBox" 
-                  placeholder="Enter input here (one value per line)&#10;" 
-                  style="width:100%;min-height:80px;padding:0.5rem;background:#2a2b32;color:#3b3bd0;border:1px solid #565869;border-radius:4px;font-family:monospace;font-size:1rem;resize:vertical;"></textarea>
-      </div>
+      <!-- Input box removed - interactive input will be handled in output box like onlineGDB -->
       
       <div style="margin-top:1.5rem; display:flex; flex-wrap:wrap; gap:0.8rem; align-items:center;">
   <button id="runBtn" class="btn btn--primary">▶ Run Code</button>
@@ -451,7 +695,18 @@
 
     <div class="section hidden" id="resultSection">
       <h2 id="resultTitle">Output</h2>
-      <pre id="resultBox">Your output will appear here...</pre>
+      <div id="terminalContainer" style="position: relative; background: #1a1a1a; border-radius: 8px; padding: 1rem; min-height: 200px; font-family: 'Consolas', 'Monaco', monospace;">
+        <!-- Terminal output display -->
+        <div id="terminalOutput" style="color: #ececf1; white-space: pre-wrap; word-wrap: break-word; margin-bottom: 0.5rem;">Your output will appear here...</div>
+        
+        <!-- Interactive input line (like real terminal) -->
+        <div id="terminalInputLine" style="display: none; color: #ececf1;">
+          <span id="inputPrompt" style="color: #10a37f; font-weight: bold;">input: </span>
+          <input type="text" id="terminalInput" 
+                 style="background: transparent; border: none; outline: none; color: #ececf1; font-family: 'Consolas', 'Monaco', monospace; font-size: 1rem; width: calc(100% - 60px); caret-color: #10a37f;"
+                 autocomplete="off" spellcheck="false">
+        </div>
+      </div>
     </div>
 
     <div class="section hidden" id="explanationSection">

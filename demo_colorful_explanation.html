@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 Colorful Grid Box Explanation - CODEX</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .main-header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .main-header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .main-header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 1200px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .input-panel {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .output-panel {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-height: 800px;
+            overflow-y: auto;
+        }
+        
+        .panel-title {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        
+        .code-input {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            resize: vertical;
+        }
+        
+        .language-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .language-btn {
+            padding: 10px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .language-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .language-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .action-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .samples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .sample-btn {
+            padding: 12px;
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .sample-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .status {
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .features {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .feature-card {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .feature-card h3 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-header">
+            <h1>🎨 Colorful Grid Box Explanation</h1>
+            <p>GitHub-style colored boxes with beautiful formatting!</p>
+        </div>
+        
+        <div class="features">
+            <h2 style="color: #667eea; margin-bottom: 20px;">✨ New Visual Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>🎨</h3>
+                    <p>Colorful Backgrounds</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📦</h3>
+                    <p>GitHub-Style Boxes</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🌈</h3>
+                    <p>Color-Coded Messages</p>
+                </div>
+                <div class="feature-card">
+                    <h3>✨</h3>
+                    <p>Hover Effects</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="demo-grid">
+            <div class="input-panel">
+                <div class="panel-title">📝 Code Input</div>
+                
+                <div class="samples-grid">
+                    <button class="sample-btn" onclick="loadSample('python')">🐍 Python</button>
+                    <button class="sample-btn" onclick="loadSample('loop')">🔄 Loop</button>
+                    <button class="sample-btn" onclick="loadSample('condition')">❓ If/Else</button>
+                    <button class="sample-btn" onclick="loadSample('c')">🔧 C</button>
+                    <button class="sample-btn" onclick="loadSample('java')">☕ Java</button>
+                </div>
+                
+                <div class="language-selector">
+                    <button class="language-btn active" onclick="selectLanguage('python')">Python</button>
+                    <button class="language-btn" onclick="selectLanguage('c')">C</button>
+                    <button class="language-btn" onclick="selectLanguage('java')">Java</button>
+                    <button class="language-btn" onclick="selectLanguage('javascript')">JavaScript</button>
+                </div>
+                
+                <textarea id="codeInput" class="code-input" placeholder="Enter your code here...">a = 10
+b = 20
+result = a + b
+if result > 25:
+    print("Large:", result)
+else:
+    print("Small:", result)</textarea>
+                
+                <button class="action-btn" onclick="explainCode()">
+                    🎨 Generate Colorful Explanation
+                </button>
+                
+                <div id="statusDiv"></div>
+            </div>
+            
+            <div class="output-panel">
+                <div class="panel-title">🎨 Colorful Output</div>
+                <div id="outputDiv" style="color: #666; text-align: center; padding: 40px;">
+                    👈 Enter code and click "Generate Colorful Explanation"
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentLanguage = 'python';
+        
+        const samples = {
+            python: `a = 10
+b = 20
+result = a + b
+if result > 25:
+    print("Large:", result)
+else:
+    print("Small:", result)`,
+            loop: `for i in range(5):
+    square = i * i
+    print(f"Square of {i} is {square}")`,
+            condition: `x = 15
+if x > 20:
+    print("Greater than 20")
+elif x > 10:
+    print("Between 10 and 20")
+else:
+    print("Less than or equal to 10")`,
+            c: `#include <stdio.h>
+
+int main() {
+    int a = 5;
+    int b = 3;
+    int sum = a + b;
+    printf("Sum: %d", sum);
+    return 0;
+}`,
+            java: `public class Main {
+    public static void main(String[] args) {
+        int x = 10;
+        int y = 20;
+        System.out.println("Sum: " + (x + y));
+    }
+}`
+        };
+        
+        function selectLanguage(lang) {
+            currentLanguage = lang;
+            document.querySelectorAll('.language-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+        
+        function loadSample(type) {
+            const code = samples[type];
+            if (code) {
+                document.getElementById('codeInput').value = code;
+                if (type === 'c') {
+                    selectLanguageByName('c');
+                } else if (type === 'java') {
+                    selectLanguageByName('java');
+                } else {
+                    selectLanguageByName('python');
+                }
+            }
+        }
+        
+        function selectLanguageByName(name) {
+            currentLanguage = name;
+            document.querySelectorAll('.language-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase() === name.toLowerCase()) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        async function explainCode() {
+            const code = document.getElementById('codeInput').value.trim();
+            const statusDiv = document.getElementById('statusDiv');
+            const outputDiv = document.getElementById('outputDiv');
+            
+            if (!code) {
+                statusDiv.innerHTML = '<div class="status error">⚠️ Please enter some code first!</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="status loading">⏳ Generating colorful explanation...</div>';
+            outputDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">Loading...</div>';
+            
+            try {
+                const response = await fetch('http://127.0.0.1:5000/explain_html', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        language: currentLanguage
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '<div class="status success">✅ Explanation generated successfully!</div>';
+                    outputDiv.innerHTML = data.html;
+                } else {
+                    statusDiv.innerHTML = '<div class="status error">❌ Error generating explanation</div>';
+                    outputDiv.innerHTML = '<div style="color: red; padding: 20px;">Failed to generate explanation</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<div class="status error">❌ Failed to connect to server</div>';
+                outputDiv.innerHTML = '<div style="color: red; padding: 20px;">Error: ' + error.message + '</div>';
+                console.error(error);
+            }
+        }
+        
+        // Auto-generate on page load
+        window.onload = () => {
+            loadSample('python');
+            setTimeout(() => explainCode(), 500);
+        };
+    </script>
+</body>
+</html>
