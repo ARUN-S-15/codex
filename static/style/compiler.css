@@ -1163,6 +1163,62 @@ select.form-control {
   border-left: 3px solid var(--color-red-400);
 }
 
+/* Issue Card Styles (for explanations like debug panel) */
+.issue-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.issue-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Responsive grid for explanation boxes */
+@media (max-width: 768px) {
+  /* Stack boxes vertically on mobile */
+  .issue-card div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.issue-badge {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.issue-title {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  margin-bottom: 0.5rem;
+}
+
+.issue-description {
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.issue-description p {
+  margin: 0.5rem 0;
+}
+
+.issue-description ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.issue-description li {
+  margin: 0.3rem 0;
+}
+
 /* Responsive design */
 @media (max-width: 1024px) {
   .editor-container {

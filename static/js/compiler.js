@@ -1,10 +1,24 @@
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("🚀 Compiler.js loaded successfully!");
+  
   const runBtn = document.getElementById("runBtn");
   const explainBtn = document.getElementById("explainBtn");
   const debugBtn = document.getElementById("debugBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const shareBtn = document.getElementById("shareBtn");
+  const newCodeBtn = document.getElementById("newCodeBtn");
 
   const codeEditor = document.getElementById("codeEditor");
   const languageSelect = document.getElementById("languageSelect");
+  
+  console.log("✅ Elements found:", {
+    runBtn: !!runBtn,
+    codeEditor: !!codeEditor,
+    languageSelect: !!languageSelect,
+    saveBtn: !!saveBtn,
+    shareBtn: !!shareBtn,
+    newCodeBtn: !!newCodeBtn
+  });
 
   const resultBox = document.getElementById("resultBox");
   const explanationBox = document.getElementById("explanationBox");
@@ -14,6 +28,134 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const debugSection = document.getElementById("debugSection"); // might not exist
   const debugBox = document.getElementById("debugOutput"); // might not exist
+
+  // ---- OLD TAB CODE (DISABLED - NO LONGER USED) ----
+  // Tabs functionality removed per user request
+
+  // ---- LOAD SHARED CODE FROM SESSION STORAGE ----
+  const sharedCode = sessionStorage.getItem('sharedCode');
+  const sharedLanguage = sessionStorage.getItem('sharedLanguage');
+  const sharedTitle = sessionStorage.getItem('sharedTitle');
+  
+  if (sharedCode) {
+    codeEditor.value = sharedCode;
+    // Clear session storage after loading
+    sessionStorage.removeItem('sharedCode');
+    sessionStorage.removeItem('sharedLanguage');
+    sessionStorage.removeItem('sharedTitle');
+    
+    updateSyntaxHighlight();
+    updateLineNumbers();
+    
+    alert(`✅ Loaded shared code: "${sharedTitle}"`);
+  }
+
+  // ---- NEW CODE BUTTON ----
+  if (newCodeBtn) {
+    newCodeBtn.addEventListener('click', () => {
+      const currentCode = codeEditor.value.trim();
+      
+      // If there's code, ask for confirmation
+      if (currentCode && !confirm("Clear current code? (Unsaved changes will be lost)")) {
+        return;
+      }
+      
+      // Clear the editor
+      codeEditor.value = "";
+      updateSyntaxHighlight();
+      updateLineNumbers();
+      
+      // Hide result sections
+      if (resultSection) resultSection.classList.add("hidden");
+      if (explanationSection) explanationSection.classList.add("hidden");
+      if (debugSection) debugSection.classList.add("hidden");
+    });
+  }
+
+  // ---- SAVE & SHARE ----
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const code = codeEditor.value.trim();
+      const languageText = languageSelect.options[languageSelect.selectedIndex].text;
+      
+      if (!code) {
+        alert("⚠️ Please write some code before saving!");
+        return;
+      }
+      
+      // Prompt user for a title
+      const title = prompt("Enter a title for your code:", "My Code");
+      
+      // If user cancels (title is null), abort the save operation
+      if (title === null) {
+        console.log("Save operation cancelled by user");
+        return;
+      }
+      
+      // Use "Untitled" only if user clicks OK with empty string
+      const finalTitle = title.trim() || "Untitled";
+      
+      try {
+        const response = await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, language: languageText, title: finalTitle })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          alert("✅ " + data.message + "\n\nView your saved projects in 📁 My Code");
+        } else {
+          alert("❌ " + (data.error || "Failed to save"));
+        }
+      } catch (err) {
+        alert("❌ Error: " + err.message);
+      }
+    });
+  }
+
+  if (shareBtn) {
+    shareBtn.addEventListener('click', async () => {
+      const code = codeEditor.value.trim();
+      const languageText = languageSelect.options[languageSelect.selectedIndex].text;
+      
+      if (!code) {
+        alert("⚠️ Please write some code before sharing!");
+        return;
+      }
+      
+      // Prompt user for a title
+      const title = prompt("Enter a title for sharing:", "Shared Code");
+      
+      // If user cancels (title is null), abort the share operation
+      if (title === null) {
+        console.log("Share operation cancelled by user");
+        return;
+      }
+      
+      // Use "Untitled" only if user clicks OK with empty string
+      const finalTitle = title.trim() || "Untitled";
+      
+      try {
+        const response = await fetch('/api/share', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, language: languageText, title: finalTitle })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          // Copy link to clipboard
+          navigator.clipboard.writeText(data.share_link);
+          alert("✅ " + data.message + "\n\nLink copied to clipboard:\n" + data.share_link);
+        } else {
+          alert("❌ " + (data.error || "Failed to create share link"));
+        }
+      } catch (err) {
+        alert("❌ Error: " + err.message);
+      }
+    });
+  }
 
   // ---- RUN CODE ---- (Terminal-style with inline input)
   if (runBtn && resultSection) {
@@ -48,21 +190,35 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Check if code needs input
-      const needsInput = detectInputRequired(code, language_id);
-      
-      if (needsInput) {
-        // Extract prompts from code
-        extractInputPrompts(code, language_id);
+      // Show loading state
+      const originalText = runBtn.innerHTML;
+      runBtn.disabled = true;
+      runBtn.innerHTML = "⏳ Running...";
+
+      try {
+        // Check if code needs input
+        const needsInput = detectInputRequired(code, language_id);
         
-        // Start with first input prompt
-        terminalOutput.textContent = "";
-        const firstPrompt = inputPrompts[0] || "Enter input: ";
-        showInputPrompt(firstPrompt);
-      } else {
-        // Run normally without input
-        terminalOutput.textContent = "⏳ Running your code...";
-        await runCodeWithInputs(code, language_id, "");
+        if (needsInput) {
+          // Extract prompts from code
+          extractInputPrompts(code, language_id);
+          
+          // Start with first input prompt
+          terminalOutput.textContent = "";
+          const firstPrompt = inputPrompts[0] || "Enter input: ";
+          showInputPrompt(firstPrompt);
+          // Re-enable button for input mode
+          runBtn.disabled = false;
+          runBtn.innerHTML = originalText;
+        } else {
+          // Run normally without input
+          terminalOutput.textContent = "⏳ Running your code...";
+          await runCodeWithInputs(code, language_id, "");
+        }
+      } finally {
+        // Re-enable button after execution
+        runBtn.disabled = false;
+        runBtn.innerHTML = originalText;
       }
     });
     
@@ -221,12 +377,13 @@ document.addEventListener("DOMContentLoaded", () => {
           output = output.trim();
         }
         
-        // Display the final output
-        if (output) {
-          terminalOutput.textContent += output;
+        // Clear the "Running your code..." message before displaying output
+        const currentText = terminalOutput.textContent;
+        if (currentText.includes("⏳ Running your code...")) {
+          terminalOutput.textContent = "";
         }
         
-        // Check if output contains errors
+        // Check if output contains errors (MOVED UP - Must be declared before use)
         const hasError = output.includes("Error") || 
                         output.includes("Traceback") || 
                         output.includes("Exception") ||
@@ -235,6 +392,39 @@ document.addEventListener("DOMContentLoaded", () => {
                         output.includes("TypeError") ||
                         output.includes("IndexError") ||
                         output.includes("ValueError");
+        
+        // Display the final output
+        if (output) {
+            // Enhanced error formatting
+            if (hasError) {
+              // Try to extract line number for Python errors
+              let formatted = output;
+              let lineMatch = formatted.match(/File ".*", line (\d+)/);
+              let lineInfo = lineMatch ? ` (Line ${lineMatch[1]})` : "";
+
+              // Highlight error type
+              let errorTypeMatch = formatted.match(/(SyntaxError|NameError|TypeError|IndexError|ValueError|Exception|Traceback)/);
+              let errorType = errorTypeMatch ? errorTypeMatch[1] : "Error";
+
+              // Add suggestions for common errors
+              let suggestion = "";
+              if (errorType === "SyntaxError") suggestion = "Check for missing colons, parentheses, or indentation.";
+              if (errorType === "NameError") suggestion = "Check for typos or undefined variables.";
+              if (errorType === "TypeError") suggestion = "Check variable types and function arguments.";
+              if (errorType === "IndexError") suggestion = "Check list/array indices.";
+              if (errorType === "ValueError") suggestion = "Check value formats and conversions.";
+
+              // Format output
+              formatted = `❌ <b>${errorType}${lineInfo}</b>\n<pre style='color:#ff6b6b;background:#1a1a1a;padding:0.5em;border-radius:6px;'>${output}</pre>`;
+              if (suggestion) {
+                formatted += `\n💡 <b>Suggestion:</b> ${suggestion}`;
+              }
+              formatted += "\n\n💡 Tip: Click the 🪲 Debug button to analyze and fix these errors!";
+              terminalOutput.innerHTML += formatted;
+            } else {
+              terminalOutput.textContent += output;
+            }
+        }
         
         if (hasError) {
           // Store the error for debugging
@@ -452,6 +642,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // Show loading state
+      const originalText = explainBtn.innerHTML;
+      explainBtn.disabled = true;
+      explainBtn.innerHTML = "⏳ Analyzing...";
+
       explanationBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">💡 Analyzing your code...<br>⏳ Please wait...</div>';
 
       try {
@@ -506,6 +701,10 @@ document.addEventListener("DOMContentLoaded", () => {
           explanationBox.innerHTML = '<div class="explanation-card" style="border-left-color: #ff5459;"><div class="explanation-title">⚠️ Server Unavailable</div><div class="explanation-content">Using local explanation generator.</div></div>' + 
             formatExplanation(localExplanation);
         }
+      } finally {
+        // Re-enable button
+        explainBtn.disabled = false;
+        explainBtn.innerHTML = originalText;
       }
     });
   }
@@ -559,7 +758,7 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("optimizeCode", code);
       localStorage.setItem("optimizeLanguage", languageText);
       
-      // Navigate to optimizer page
+      // Navigate to optimizer page (no need to disable button since we're leaving the page)
       window.location.href = "/optimizer";
     });
   }
@@ -593,7 +792,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   function updateSyntaxHighlight() {
-    if (!codeEditor || !highlightedCode) return;
+    if (!codeEditor || !highlightedCode) {
+      console.log("Missing elements:", { codeEditor: !!codeEditor, highlightedCode: !!highlightedCode });
+      return;
+    }
     
     const code = codeEditor.value;
     const languageId = languageSelect.value;
@@ -602,12 +804,18 @@ document.addEventListener("DOMContentLoaded", () => {
     // Update language class
     highlightedCode.className = `language-${language}`;
     
-    // Escape HTML and highlight
+    // Set text content (this makes text visible even without Prism)
     highlightedCode.textContent = code;
     
-    // Apply Prism highlighting
+    // Apply Prism highlighting if available
     if (window.Prism) {
-      Prism.highlightElement(highlightedCode);
+      try {
+        Prism.highlightElement(highlightedCode);
+      } catch (e) {
+        console.error("Prism highlighting error:", e);
+      }
+    } else {
+      console.log("Prism not loaded yet");
     }
   }
   
@@ -774,6 +982,56 @@ document.addEventListener("DOMContentLoaded", () => {
       }).catch(err => {
         alert("Failed to copy: " + err);
       });
+    });
+  }
+
+  // ---- DOWNLOAD CODE BUTTON ----
+  const downloadCodeBtn = document.getElementById("downloadCodeBtn");
+  
+  if (downloadCodeBtn && codeEditor && languageSelect) {
+    downloadCodeBtn.addEventListener("click", () => {
+      const code = codeEditor.value;
+      
+      if (!code) {
+        alert("⚠️ No code to download!");
+        return;
+      }
+
+      // Get file extension based on language
+      const languageId = languageSelect.value;
+      const extensions = {
+        "71": ".py",   // Python
+        "50": ".c",    // C
+        "54": ".cpp",  // C++
+        "63": ".js",   // JavaScript
+        "62": ".java"  // Java
+      };
+      const extension = extensions[languageId] || ".txt";
+      
+      // Create filename
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const filename = `code_${timestamp}${extension}`;
+      
+      // Create blob and download
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      // Visual feedback
+      const originalText = downloadCodeBtn.textContent;
+      downloadCodeBtn.textContent = "✓ Downloaded!";
+      downloadCodeBtn.style.background = "#10b981";
+      
+      setTimeout(() => {
+        downloadCodeBtn.textContent = originalText;
+        downloadCodeBtn.style.background = "";
+      }, 2000);
     });
   }
 
@@ -954,4 +1212,96 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Refresh history every 30 seconds
   setInterval(loadHistory, 30000);
+
+  // ---- KEYBOARD SHORTCUTS ----
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Enter or Cmd+Enter to run code
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (runBtn && !runBtn.disabled) {
+        console.log('⌨️ Keyboard shortcut: Ctrl+Enter -> Run code');
+        runBtn.click();
+      }
+    }
+    
+    // Ctrl+S or Cmd+S to save code
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (saveBtn && !saveBtn.disabled) {
+        console.log('⌨️ Keyboard shortcut: Ctrl+S -> Save code');
+        saveBtn.click();
+      }
+    }
+    
+    // Ctrl+E or Cmd+E to explain code
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault();
+      if (explainBtn && !explainBtn.disabled) {
+        console.log('⌨️ Keyboard shortcut: Ctrl+E -> Explain code');
+        explainBtn.click();
+      }
+    }
+    
+    // Ctrl+D or Cmd+D to debug code
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault();
+      if (debugBtn && !debugBtn.disabled) {
+        console.log('⌨️ Keyboard shortcut: Ctrl+D -> Debug code');
+        debugBtn.click();
+      }
+    }
+  });
+  
+  // Load project if ?load=id parameter is present
+  const urlParams = new URLSearchParams(window.location.search);
+  const loadId = urlParams.get('load');
+  
+  if (loadId) {
+    loadProject(loadId);
+  }
+  
+  async function loadProject(id) {
+    try {
+      const response = await fetch(`/api/history/${id}`);
+      const data = await response.json();
+      
+      if (data.code_snippet) {
+        codeEditor.value = data.code_snippet;
+        
+        // Set the language
+        const languageMap = {
+          'Python': '71',
+          'C': '50',
+          'C++': '54',
+          'JavaScript': '63',
+          'Java': '62'
+        };
+        
+        // Find language in the name (handles "JavaScript (Node.js...)")
+        let languageId = '71'; // default to Python
+        for (const [lang, id] of Object.entries(languageMap)) {
+          if (data.language.includes(lang)) {
+            languageId = id;
+            break;
+          }
+        }
+        
+        languageSelect.value = languageId;
+        
+        // Update syntax highlighting and line numbers
+        if (typeof updateSyntaxHighlight === 'function') {
+          updateSyntaxHighlight();
+        }
+        if (typeof updateLineNumbers === 'function') {
+          updateLineNumbers();
+        }
+        
+        console.log('✅ Project loaded successfully:', data.title);
+      } else {
+        alert('❌ Failed to load project: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('❌ Error loading project: ' + err.message);
+    }
+  }
 });
