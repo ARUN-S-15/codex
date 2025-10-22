@@ -6,9 +6,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from dotenv import load_dotenv
 from database import init_db, fetch_one, execute_query, add_to_history, get_user_history, get_history_by_id, delete_history_item, generate_code_title
+import google.generativeai as genai
+import json
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Configure Google Gemini API
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    # Use gemini-2.5-flash - stable, fast, and efficient
+    gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+    print("✅ Gemini AI enabled: gemini-2.5-flash")
+else:
+    gemini_model = None
+    print("⚠️ WARNING: GEMINI_API_KEY not found in .env file. AI features will be disabled.")
 
 app = Flask(__name__)
 # Use environment variable for secret key, fallback to generated key if not found
@@ -706,16 +719,9 @@ def optimize_code():
     if not code:
         return jsonify({"error": "No code provided"}), 400
 
-    if language != "python":
-        # For non-python languages, return a no-op placeholder
-        return jsonify({
-            "optimized": code, 
-            "optimizations": [],
-            "notes": "No optimizer implemented for this language."
-        })
-
     try:
-        result = ai_optimize_python(code)
+        # Use AI optimizer for all languages
+        result = ai_optimize_code(code, language)
         optimized = result["optimized_code"]
         optimizations = result["optimizations"]
         
@@ -938,158 +944,255 @@ def generate_detailed_line_explanation(line, stripped, i, language):
     return "\n".join(explanations)
 
 
+def ai_explain_code(code, language):
+    """
+    AI-powered code explanation using Google Gemini API.
+    Provides intelligent, context-aware explanations for any language.
+    """
+    if not gemini_model:
+        return None  # Fall back to rule-based explanation
+    
+    try:
+        prompt = f"""You are an expert programming tutor. Explain this {language} code in a clear, educational way.
+
+**Code:**
+```{language}
+{code}
+```
+
+**Return ONLY valid JSON with this structure:**
+{{
+  "summary": "One sentence describing what this code does",
+  "algorithm": "Explain the algorithm/approach used",
+  "time_complexity": "O(n) or O(n²) etc.",
+  "time_explanation": "Brief explanation of time complexity",
+  "space_complexity": "O(1) or O(n) etc.",
+  "space_explanation": "Brief explanation of space complexity",
+  "steps": [
+    {{
+      "title": "Step name (3-5 words)",
+      "explanation": "What this step does",
+      "code_snippet": "key line(s) of code for this step",
+      "why": "Why this step is important"
+    }}
+  ],
+  "key_insights": [
+    "Important insight about the code",
+    "Another key learning point"
+  ]
+}}
+
+Focus on:
+- Clear, beginner-friendly language
+- Actual code logic and flow
+- Important concepts demonstrated
+- Common pitfalls or edge cases
+
+Return ONLY the JSON, no markdown formatting."""
+
+        response = gemini_model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean up response
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        
+        # Parse JSON
+        result = json.loads(response_text)
+        return result
+        
+    except Exception as e:
+        print(f"AI explanation error: {e}")
+        return None  # Fall back to rule-based
+
+
 def generate_comprehensive_explanation(code, language):
     """
     Generate intelligent, ChatGPT-style code explanation with rich, detailed content.
     Maximum information density with minimal spacing.
     """
-    # Analyze the code structure deeply
-    code_analysis = deep_analyze_code(code, language)
+    # Try AI explanation first, fall back to rule-based if unavailable
+    ai_result = ai_explain_code(code, language)
     
-    # Build HTML with dense, information-rich layout
+    if ai_result:
+        # Use AI-generated analysis
+        code_analysis = {
+            'summary': ai_result.get('summary', ''),
+            'steps': [
+                {
+                    'title': step.get('title', ''),
+                    'explanation': step.get('explanation', ''),
+                    'code_block': step.get('code_snippet', ''),
+                    'why': step.get('why', '')
+                }
+                for step in ai_result.get('steps', [])
+            ],
+            'time_complexity': ai_result.get('time_complexity', ''),
+            'time_explanation': ai_result.get('time_explanation', ''),
+            'space_complexity': ai_result.get('space_complexity', ''),
+            'space_explanation': ai_result.get('space_explanation', ''),
+            'insights': ai_result.get('key_insights', [])
+        }
+    else:
+        # Fall back to rule-based analysis
+        code_analysis = deep_analyze_code(code, language)
+    
+    # Build HTML with 3-4 BIG BOXES with RICH CONTENT
     html_parts = []
     
     # ═══════════════════════════════════════════════════════════
-    # COMPACT GRID LAYOUT - Readable text, minimal padding
+    # BOX 1: OVERVIEW & COMPLEXITY (Combined - Top Section)
     # ═══════════════════════════════════════════════════════════
     html_parts.append('''
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
-        <!-- ALGORITHM OVERVIEW (Left) -->
-        <div class="issue-card" style="margin: 0; padding: 0.5rem 0.6rem; background: var(--color-bg-1); border-left: 3px solid #3b82f6;">
-            <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem;">
-                <span class="issue-badge" style="background: #3b82f6; color: white; padding: 0.2rem 0.5rem; border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
-                    📋 ALGORITHM
-                </span>
-            </div>
-            <div style="color: var(--color-text); line-height: 1.45; font-size: 0.9rem;">
-    ''')
-    
-    if code_analysis['summary']:
-        # Add more detail to summary with READABLE text size
-        html_parts.append(f"<p style='margin: 0 0 0.4rem 0; font-weight: 600; font-size: 0.9rem;'>{code_analysis['summary']}</p>")
-        
-        # Add additional context based on algorithm type (readable size)
-        if 'BFS' in code_analysis['summary'] or 'Breadth-First' in code_analysis['summary']:
-            html_parts.append("<p style='margin: 0; font-size: 0.85rem; color: var(--color-text-secondary);'>Uses queue (FIFO) for level-order traversal. Optimal for shortest paths in unweighted graphs.</p>")
-        elif 'DFS' in code_analysis['summary'] or 'Depth-First' in code_analysis['summary']:
-            html_parts.append("<p style='margin: 0; font-size: 0.85rem; color: var(--color-text-secondary);'>Uses stack (LIFO) or recursion for deep exploration. Good for finding all paths.</p>")
-        elif 'Dynamic Programming' in code_analysis['summary'] or 'DP' in code_analysis['summary']:
-            html_parts.append("<p style='margin: 0; font-size: 0.85rem; color: var(--color-text-secondary);'>Stores solutions to subproblems to avoid recomputation. Bottom-up or top-down approach.</p>")
-        elif 'Binary Search' in code_analysis['summary']:
-            html_parts.append("<p style='margin: 0; font-size: 0.85rem; color: var(--color-text-secondary);'>Divides search space in half each iteration. Requires sorted input array.</p>")
-        elif 'Sorting' in code_analysis['summary']:
-            html_parts.append("<p style='margin: 0; font-size: 0.85rem; color: var(--color-text-secondary);'>Arranges elements in order. Compare-and-swap based algorithm.</p>")
-    
-    html_parts.append('</div></div>')
-    
-    # ═══════════════════════════════════════════════════════════
-    # COMPLEXITY ANALYSIS (Right side) - Readable text, compact padding
-    # ═══════════════════════════════════════════════════════════
-    html_parts.append('''
-        <!-- COMPLEXITY ANALYSIS (Right) -->
-        <div class="issue-card" style="margin: 0; padding: 0.5rem 0.6rem; background: var(--color-bg-2); border-left: 3px solid #f59e0b;">
-            <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem;">
-                <span class="issue-badge" style="background: #f59e0b; color: white; padding: 0.2rem 0.5rem; border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
-                    ⏱️ COMPLEXITY
-                </span>
-            </div>
+    <div class="issue-card" style="margin-bottom: 1rem; padding: 1rem 1.2rem; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%); border-left: 4px solid #3b82f6;">
+        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
+            <span class="issue-badge" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 0.4rem 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(59,130,246,0.3);">
+                🎯 CODE OVERVIEW & ANALYSIS
+            </span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.2rem;">
+            <!-- Left: Algorithm Summary -->
             <div>
     ''')
     
-    if code_analysis['time_complexity']:
+    if code_analysis['summary']:
         html_parts.append(f'''
-        <div style="margin-bottom: 0.4rem;">
-            <p style="margin: 0 0 0.2rem 0; color: var(--color-text); font-weight: 600; font-size: 0.9rem;">
-                ⏱️ Time: <span style="color: #f59e0b; font-family: var(--font-family-mono);">{code_analysis['time_complexity']}</span>
-            </p>
-            <p style="margin: 0 0 0.3rem 0; color: var(--color-text-secondary); line-height: 1.45; font-size: 0.85rem;">
-                {code_analysis['time_explanation']}
-            </p>
-        </div>
+                <h3 style="margin: 0 0 0.6rem 0; color: var(--color-text); font-size: 1.05rem; font-weight: 700;">
+                    📋 What This Code Does
+                </h3>
+                <p style="margin: 0 0 0.8rem 0; color: var(--color-text); line-height: 1.6; font-size: 0.95rem; font-weight: 500;">
+                    {code_analysis['summary']}
+                </p>
+        ''')
+        
+        # Add algorithm context
+        algo_context = ""
+        if 'BFS' in code_analysis['summary'] or 'Breadth-First' in code_analysis['summary']:
+            algo_context = "Uses a <strong>queue (FIFO)</strong> data structure for level-order traversal. Explores all nodes at the current depth before moving to nodes at the next depth level. Optimal for finding shortest paths in unweighted graphs and solving minimum step problems."
+        elif 'DFS' in code_analysis['summary'] or 'Depth-First' in code_analysis['summary']:
+            algo_context = "Uses <strong>stack (LIFO)</strong> or <strong>recursion</strong> for deep exploration. Goes as deep as possible along each branch before backtracking. Perfect for path finding, cycle detection, and exploring all possible solutions."
+        elif 'Dynamic Programming' in code_analysis['summary'] or 'DP' in code_analysis['summary']:
+            algo_context = "Stores solutions to <strong>overlapping subproblems</strong> to avoid redundant computation. Uses memoization (top-down) or tabulation (bottom-up) approach. Essential for optimization problems with optimal substructure."
+        elif 'Binary Search' in code_analysis['summary']:
+            algo_context = "Divides search space in <strong>half with each iteration</strong>, achieving logarithmic time complexity. Requires data to be sorted. Each comparison eliminates half of the remaining possibilities."
+        elif 'Sorting' in code_analysis['summary']:
+            algo_context = "Arranges elements in a specific order using <strong>compare-and-swap</strong> operations. Forms the foundation for many other algorithms that require ordered data."
+        else:
+            algo_context = "This code implements a specific logic flow to solve the problem efficiently."
+        
+        html_parts.append(f'''
+                <div style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid #3b82f6; padding: 0.8rem; border-radius: 6px; margin-bottom: 1rem;">
+                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
+                        <strong style="color: #3b82f6;">🧠 Algorithm Concept:</strong><br>
+                        {algo_context}
+                    </p>
+                </div>
+        ''')
+    
+    # Right: Complexity Analysis
+    html_parts.append('''
+            </div>
+            <div>
+                <h3 style="margin: 0 0 0.6rem 0; color: var(--color-text); font-size: 1.05rem; font-weight: 700;">
+                    ⚡ Performance
+                </h3>
+    ''')
+    
+    if code_analysis['time_complexity']:
+        performance_badge = ""
+        if 'O(1)' in code_analysis['time_complexity']:
+            performance_badge = '<span style="background: #10b981; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">EXCELLENT</span>'
+        elif 'O(log n)' in code_analysis['time_complexity']:
+            performance_badge = '<span style="background: #22c55e; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">GREAT</span>'
+        elif 'O(n)' in code_analysis['time_complexity']:
+            performance_badge = '<span style="background: #3b82f6; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">GOOD</span>'
+        elif 'O(n log n)' in code_analysis['time_complexity']:
+            performance_badge = '<span style="background: #f59e0b; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">OPTIMAL</span>'
+        elif 'O(n²)' in code_analysis['time_complexity'] or 'O(n^2)' in code_analysis['time_complexity']:
+            performance_badge = '<span style="background: #ef4444; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">CONSIDER OPTIMIZATION</span>'
+        
+        html_parts.append(f'''
+                <div style="background: rgba(245, 158, 11, 0.08); padding: 0.8rem; border-radius: 6px; margin-bottom: 0.7rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                        <span style="color: var(--color-text); font-weight: 700; font-size: 0.9rem;">⏱️ Time Complexity</span>
+                        {performance_badge}
+                    </div>
+                    <p style="margin: 0 0 0.4rem 0; color: #f59e0b; font-family: var(--font-family-mono); font-size: 1.15rem; font-weight: 700;">
+                        {code_analysis['time_complexity']}
+                    </p>
+                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.6; font-size: 0.85rem;">
+                        {code_analysis['time_explanation']}
+                    </p>
+                </div>
         ''')
     
     if code_analysis['space_complexity']:
         html_parts.append(f'''
-        <div style="margin-bottom: 0.3rem;">
-            <p style="margin: 0 0 0.2rem 0; color: var(--color-text); font-weight: 600; font-size: 0.9rem;">
-                💾 Space: <span style="color: #f59e0b; font-family: var(--font-family-mono);">{code_analysis['space_complexity']}</span>
-            </p>
-            <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.45; font-size: 0.85rem;">
-                {code_analysis['space_explanation']}
-            </p>
-        </div>
+                <div style="background: rgba(139, 92, 246, 0.08); padding: 0.8rem; border-radius: 6px;">
+                    <span style="color: var(--color-text); font-weight: 700; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">💾 Space Complexity</span>
+                    <p style="margin: 0 0 0.4rem 0; color: #8b5cf6; font-family: var(--font-family-mono); font-size: 1.15rem; font-weight: 700;">
+                        {code_analysis['space_complexity']}
+                    </p>
+                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.6; font-size: 0.85rem;">
+                        {code_analysis['space_explanation']}
+                    </p>
+                </div>
         ''')
-    
-    # Add performance notes
-    if 'O(V + E)' in code_analysis.get('time_complexity', ''):
-        html_parts.append('<p style="margin: 0.3rem 0 0 0; padding: 0.3rem; background: rgba(245,158,11,0.1); border-radius: 4px; font-size: 0.76rem; color: var(--color-text-secondary);">📊 Linear in graph size. Optimal for traversal.</p>')
-    elif 'O(n²)' in code_analysis.get('time_complexity', '') or 'O(n^2)' in code_analysis.get('time_complexity', ''):
-        html_parts.append('<p style="margin: 0.3rem 0 0 0; padding: 0.3rem; background: rgba(245,158,11,0.1); border-radius: 4px; font-size: 0.76rem; color: var(--color-text-secondary);">⚠️ Quadratic. Consider O(n log n) alternatives.</p>')
-    elif 'O(log n)' in code_analysis.get('time_complexity', ''):
-        html_parts.append('<p style="margin: 0.3rem 0 0 0; padding: 0.3rem; background: rgba(245,158,11,0.1); border-radius: 4px; font-size: 0.76rem; color: var(--color-text-secondary);">✨ Logarithmic. Very efficient for large inputs.</p>')
-    elif 'O(n)' in code_analysis.get('time_complexity', ''):
-        html_parts.append('<p style="margin: 0.3rem 0 0 0; padding: 0.3rem; background: rgba(245,158,11,0.1); border-radius: 4px; font-size: 0.76rem; color: var(--color-text-secondary);">✅ Linear. Scales well with input size.</p>')
     
     html_parts.append('</div></div></div>')
     
     # ═══════════════════════════════════════════════════════════
-    # STEP-BY-STEP - Readable text, compact padding
+    # BOX 2: STEP-BY-STEP EXECUTION (Full Width - Main Content)
     # ═══════════════════════════════════════════════════════════
     html_parts.append('''
-    <div class="issue-card" style="margin-bottom: 0.6rem; padding: 0.5rem 0.6rem; background: var(--color-bg-3); border-left: 3px solid #22c55e;">
-        <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;">
-            <span class="issue-badge" style="background: #22c55e; color: white; padding: 0.2rem 0.5rem; border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
-                🔍 STEP-BY-STEP
+    <div class="issue-card" style="margin-bottom: 1rem; padding: 1rem 1.2rem; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%); border-left: 4px solid #22c55e;">
+        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
+            <span class="issue-badge" style="background: linear-gradient(135deg, #22c55e, #10b981); color: white; padding: 0.4rem 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(34,197,94,0.3);">
+                🔍 STEP-BY-STEP EXECUTION FLOW
             </span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 0.8rem;">
     ''')
     
     for i, step in enumerate(code_analysis['steps'], 1):
         color_map = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#ec4899', '#10b981']
-        step_color = color_map[i % len(color_map)]
+        step_color = color_map[(i - 1) % len(color_map)]
         
         html_parts.append(f'''
-        <div style="padding: 0.5rem 0.6rem; background: rgba(255, 255, 255, 0.03); border-left: 2px solid {step_color}; border-radius: 4px;">
-            <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem;">
-                <span style="background: {step_color}; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem; min-width: 22px; text-align: center;">
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255,255,255,0.1); border-left: 3px solid {step_color}; border-radius: 8px; padding: 0.9rem; transition: all 0.2s;">
+            <div style="display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.7rem;">
+                <span style="background: {step_color}; color: white; padding: 0.35rem 0.7rem; border-radius: 8px; font-weight: 800; font-size: 0.9rem; min-width: 32px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
                     {i}
                 </span>
-                <span style="color: var(--color-text); font-weight: 600; font-size: 0.88rem; line-height: 1.3;">
-                    {step['title']}
-                </span>
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--color-text); font-weight: 700; font-size: 1rem; line-height: 1.4;">
+                        {step['title']}
+                    </h4>
+                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
+                        {step['explanation']}
+                    </p>
+                </div>
             </div>
         ''')
         
         if step.get('code_block'):
             safe_code = step['code_block'].replace('<', '&lt;').replace('>', '&gt;')
-            # Show more code lines (up to 4) with truncation
-            code_lines = safe_code.split('\n')
-            if len(code_lines) > 4:
-                safe_code_compact = '\n'.join(code_lines[:4]) + '\n...'
-            else:
-                safe_code_compact = safe_code
             html_parts.append(f'''
-            <div style="background: var(--color-charcoal-800); border: 1px solid var(--color-border); border-radius: 3px; padding: 0.4rem 0.5rem; margin: 0.3rem 0; overflow-x: auto;">
-                <pre style="margin: 0; font-family: var(--font-family-mono); font-size: 0.8rem; color: var(--color-text); line-height: 1.4;"><code>{safe_code_compact}</code></pre>
+            <div style="background: var(--color-charcoal-800); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 0.7rem; margin: 0.6rem 0; overflow-x: auto;">
+                <pre style="margin: 0; font-family: var(--font-family-mono); font-size: 0.88rem; color: var(--color-text); line-height: 1.6;"><code>{safe_code}</code></pre>
             </div>
             ''')
         
-        # Show FULL explanation (no truncation) with READABLE text
-        explanation = step['explanation']
-        html_parts.append(f'''
-            <p style="color: var(--color-text-secondary); line-height: 1.5; margin: 0.3rem 0; font-size: 0.85rem;">
-                {explanation}
-            </p>
-        ''')
-        
-        # Show full "why" with compact spacing
         if step.get('why'):
-            why_text = step['why']
             html_parts.append(f'''
-            <div style="background: rgba(59, 130, 246, 0.1); border-left: 2px solid #3b82f6; padding: 0.4rem; margin-top: 0.4rem; border-radius: 3px;">
-                <p style="margin: 0; color: var(--color-text); line-height: 1.45; font-size: 0.82rem;">
-                    <strong style="color: #3b82f6;">💡</strong> {why_text}
+            <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06)); border-left: 3px solid #3b82f6; padding: 0.7rem; border-radius: 6px; margin-top: 0.6rem;">
+                <p style="margin: 0; color: var(--color-text); line-height: 1.65; font-size: 0.88rem;">
+                    <strong style="color: #3b82f6; font-weight: 700;">💡 Why This Matters:</strong> {step['why']}
                 </p>
             </div>
             ''')
@@ -1099,53 +1202,93 @@ def generate_comprehensive_explanation(code, language):
     html_parts.append('</div></div>')
     
     # ═══════════════════════════════════════════════════════════
-    # INSIGHTS & EDGE CASES - Readable text, compact padding
+    # BOX 3: KEY INSIGHTS (Combined Bottom Section)
     # ═══════════════════════════════════════════════════════════
     html_parts.append('''
-    <div class="issue-card" style="margin-bottom: 0.5rem; padding: 0.5rem 0.6rem; background: var(--color-bg-5); border-left: 3px solid #8b5cf6;">
-        <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem;">
-            <span class="issue-badge" style="background: #8b5cf6; color: white; padding: 0.2rem 0.5rem; border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
-                💡 INSIGHTS & EDGE CASES
+    <div class="issue-card" style="margin-bottom: 0.5rem; padding: 1rem 1.2rem; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); border-left: 4px solid #8b5cf6;">
+        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
+            <span class="issue-badge" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 0.4rem 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(139,92,246,0.3);">
+                💡 KEY INSIGHTS & IMPORTANT NOTES
             </span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
     ''')
     
-    # Left column - Insights + Optimizations (NO limits!)
+    # Left column: Insights & Optimizations
     html_parts.append('<div>')
     if code_analysis.get('insights'):
-        html_parts.append('<p style="margin: 0 0 0.4rem 0; color: var(--color-text); font-weight: 600; font-size: 0.88rem;">🎯 Key Insights:</p><ul style="margin: 0; padding-left: 1.2rem; color: var(--color-text-secondary); line-height: 1.5; font-size: 0.85rem;">')
-        for insight in code_analysis['insights']:  # Show ALL insights
-            html_parts.append(f'<li style="margin: 0.3rem 0;">{insight}</li>')
+        html_parts.append('''
+            <h3 style="margin: 0 0 0.7rem 0; color: var(--color-text); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="background: #8b5cf6; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem;">🎯</span>
+                Key Takeaways
+            </h3>
+        ''')
+        html_parts.append('<ul style="margin: 0; padding-left: 0; list-style: none;">')
+        for insight in code_analysis['insights']:
+            html_parts.append(f'''
+                <li style="margin: 0 0 0.7rem 0; padding-left: 1.8rem; position: relative; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
+                    <span style="position: absolute; left: 0; top: 0.1rem; color: #8b5cf6; font-weight: 700;">▸</span>
+                    {insight}
+                </li>
+            ''')
         html_parts.append('</ul>')
     
     if code_analysis.get('optimizations'):
-        html_parts.append('<p style="margin: 0.5rem 0 0.4rem 0; color: var(--color-text); font-weight: 600; font-size: 0.88rem;">🚀 Optimizations:</p><ul style="margin: 0; padding-left: 1.2rem; color: var(--color-text-secondary); line-height: 1.5; font-size: 0.85rem;">')
-        for opt in code_analysis['optimizations']:  # Show ALL optimizations
-            html_parts.append(f'<li style="margin: 0.3rem 0;">{opt}</li>')
+        html_parts.append('''
+            <h3 style="margin: 1.2rem 0 0.7rem 0; color: var(--color-text); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="background: #22c55e; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem;">🚀</span>
+                Potential Optimizations
+            </h3>
+        ''')
+        html_parts.append('<ul style="margin: 0; padding-left: 0; list-style: none;">')
+        for opt in code_analysis['optimizations']:
+            html_parts.append(f'''
+                <li style="margin: 0 0 0.7rem 0; padding-left: 1.8rem; position: relative; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
+                    <span style="position: absolute; left: 0; top: 0.1rem; color: #22c55e; font-weight: 700;">▸</span>
+                    {opt}
+                </li>
+            ''')
         html_parts.append('</ul>')
     html_parts.append('</div>')
     
-    # Right column - Edge Cases + Additional context (NO limits!)
+    # Right column: Edge Cases & When to Use
     html_parts.append('<div>')
     if code_analysis.get('edge_cases'):
-        html_parts.append('<p style="margin: 0 0 0.4rem 0; color: var(--color-text); font-weight: 600; font-size: 0.88rem;">⚠️ Edge Cases:</p><ul style="margin: 0; padding-left: 1.2rem; color: var(--color-text-secondary); line-height: 1.5; font-size: 0.85rem;">')
-        for edge in code_analysis['edge_cases']:  # Show ALL edge cases
-            html_parts.append(f'<li style="margin: 0.3rem 0;">{edge}</li>')
+        html_parts.append('''
+            <h3 style="margin: 0 0 0.7rem 0; color: var(--color-text); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="background: #ef4444; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem;">⚠️</span>
+                Edge Cases to Handle
+            </h3>
+        ''')
+        html_parts.append('<ul style="margin: 0; padding-left: 0; list-style: none;">')
+        for edge in code_analysis['edge_cases']:
+            html_parts.append(f'''
+                <li style="margin: 0 0 0.7rem 0; padding-left: 1.8rem; position: relative; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
+                    <span style="position: absolute; left: 0; top: 0.1rem; color: #ef4444; font-weight: 700;">▸</span>
+                    {edge}
+                </li>
+            ''')
         html_parts.append('</ul>')
         
-        # Add practical tips based on algorithm (readable size)
-        html_parts.append('<div style="margin-top: 0.5rem; padding: 0.4rem; background: rgba(139,92,246,0.1); border-radius: 4px; font-size: 0.82rem; line-height: 1.45;">')
+        # Practical application tips
+        html_parts.append('<div style="margin-top: 1.2rem; background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05)); border-left: 3px solid #8b5cf6; padding: 0.9rem; border-radius: 6px;">')
+        html_parts.append('<h4 style="margin: 0 0 0.5rem 0; color: #8b5cf6; font-size: 0.95rem; font-weight: 700;">💭 When to Use This Approach:</h4>')
+        
+        practical_uses = ""
         if 'BFS' in str(code_analysis.get('summary', '')):
-            html_parts.append('<strong style="color: #8b5cf6;">💭 When to use:</strong> Shortest path, level-order traversal, minimum steps problems.')
+            practical_uses = "Perfect for shortest path problems, level-order tree traversal, finding minimum steps, exploring all neighbors before going deeper."
         elif 'DFS' in str(code_analysis.get('summary', '')):
-            html_parts.append('<strong style="color: #8b5cf6;">💭 When to use:</strong> Path finding, cycle detection, topological sorting.')
+            practical_uses = "Ideal for path finding, cycle detection, topological sorting, exploring all possible solutions, backtracking problems."
         elif 'Dynamic Programming' in str(code_analysis.get('summary', '')):
-            html_parts.append('<strong style="color: #8b5cf6;">💭 When to use:</strong> Overlapping subproblems, optimization problems.')
+            practical_uses = "Essential for optimization problems with overlapping subproblems, fibonacci-like sequences, knapsack problems, longest subsequences."
         elif 'Binary Search' in str(code_analysis.get('summary', '')):
-            html_parts.append('<strong style="color: #8b5cf6;">💭 When to use:</strong> Sorted arrays, finding boundaries, optimization.')
+            practical_uses = "Best for searching in sorted arrays, finding boundaries, rotated array searches, optimization on answer space."
         elif 'Sorting' in str(code_analysis.get('summary', '')):
-            html_parts.append('<strong style="color: #8b5cf6;">💭 When to use:</strong> Ordering data, preprocessing for binary search.')
+            practical_uses = "Required for ordering data, preprocessing for binary search, finding duplicates/unique elements, range queries."
+        else:
+            practical_uses = "Use this approach when the problem structure matches the algorithm's strengths and constraints."
+        
+        html_parts.append(f'<p style="margin: 0; color: var(--color-text); line-height: 1.7; font-size: 0.88rem;">{practical_uses}</p>')
         html_parts.append('</div>')
     html_parts.append('</div>')
     
@@ -1158,10 +1301,23 @@ def deep_analyze_code(code, language):
     """
     Deeply analyze code to understand the actual algorithm, not just patterns.
     Returns a comprehensive analysis with step-by-step breakdown.
+    SUPPORTS ALL LANGUAGES: Python, Java, C++, C, JavaScript
     """
     import re
     
-    lines = [l for l in code.strip().split('\n') if l.strip() and not l.strip().startswith('#')]
+    # Normalize language name
+    language = language.lower().strip()
+    lang_map = {'javascript (node.js 12.14.0)': 'javascript', 'java (openjdk 13.0.1)': 'java', 'c++': 'cpp'}
+    language = lang_map.get(language, language)
+    
+    # Remove comments based on language
+    if language in ['python']:
+        lines = [l for l in code.strip().split('\n') if l.strip() and not l.strip().startswith('#')]
+    elif language in ['java', 'cpp', 'c', 'javascript']:
+        lines = [l for l in code.strip().split('\n') if l.strip() and not l.strip().startswith('//')]
+    else:
+        lines = [l for l in code.strip().split('\n') if l.strip()]
+    
     code_lower = code.lower()
     
     analysis = {
@@ -1176,15 +1332,34 @@ def deep_analyze_code(code, language):
         'optimizations': []
     }
     
-    # Detect algorithm type by analyzing actual patterns
-    has_bfs = 'deque' in code or ('queue' in code_lower and 'popleft' in code)
-    has_dfs = 'stack' in code_lower or ('def ' in code and code.count('def ') < 3 and any(func_name in code[code.find(func_name)+len(func_name):] for func_name in extract_function_names(code)))
-    has_dp = 'dp[' in code or 'memo' in code_lower or 'cache' in code_lower
-    has_graph = 'graph' in code_lower or 'adjacency' in code_lower or ('defaultdict(list)' in code)
-    has_sorting = 'sort' in code_lower or ('bubble' in code_lower and 'swap' in code_lower)
-    has_binary_search = 'binary' in code_lower or ('left' in code and 'right' in code and 'mid' in code)
-    has_two_pointers = code.count('while ') >= 1 and 'left' in code and 'right' in code
-    has_sliding_window = 'window' in code_lower or ('left' in code and code.count('for ') == 1)
+    # Detect algorithm type by analyzing patterns ACROSS ALL LANGUAGES
+    # BFS Detection (multi-language)
+    has_bfs = ('deque' in code or 'queue' in code_lower and ('poll' in code_lower or 'popleft' in code or 'remove' in code_lower))
+    
+    # DFS Detection (multi-language)
+    has_dfs = ('stack' in code_lower or 'recursion' in code_lower or 
+               ('def ' in code and any(func in code for func in extract_function_names(code))) or  # Python
+               (language in ['java', 'cpp', 'c'] and count_function_calls(code) > 0))  # Java/C++/C
+    
+    # Dynamic Programming (multi-language)
+    has_dp = 'dp[' in code or 'memo' in code_lower or 'cache' in code_lower or 'table' in code_lower
+    
+    # Graph algorithms (multi-language)
+    has_graph = ('graph' in code_lower or 'adjacency' in code_lower or 'adj' in code_lower or 
+                 'vertex' in code_lower or 'edge' in code_lower or 'node' in code_lower)
+    
+    # Sorting (multi-language)
+    has_sorting = ('sort' in code_lower or 'bubble' in code_lower or 'merge' in code_lower or 
+                   'quick' in code_lower or ('swap' in code_lower and count_loop_depth(code) >= 2))
+    
+    # Binary Search (multi-language)
+    has_binary_search = ('binary' in code_lower or ('left' in code_lower and 'right' in code_lower and 'mid' in code_lower))
+    
+    # Two Pointers (multi-language)
+    has_two_pointers = (('while ' in code or 'while(' in code) and 'left' in code_lower and 'right' in code_lower)
+    
+    # Sliding Window (multi-language)
+    has_sliding_window = 'window' in code_lower or ('start' in code_lower and 'end' in code_lower and count_loop_depth(code) == 1)
     
     # Calculate loop depth early
     loop_depth = count_loop_depth(code)
@@ -1252,7 +1427,7 @@ def deep_analyze_code(code, language):
     # Generate step-by-step explanation
     analysis['steps'] = generate_intelligent_steps(code, language, has_bfs, has_dfs, has_dp, has_graph, has_sorting)
     
-    # Generate insights
+    # Generate insights - ALWAYS provide insights for ALL languages
     if has_bfs:
         analysis['insights'].append("BFS guarantees shortest path in unweighted graphs")
         analysis['insights'].append("Level-by-level exploration ensures optimal solution")
@@ -1263,18 +1438,72 @@ def deep_analyze_code(code, language):
     if 'defaultdict' in code:
         analysis['insights'].append("defaultdict automatically initializes missing keys")
     
-    # Edge cases
+    # Add general insights based on language features (all languages)
+    if language in ['cpp', 'c++']:
+        if 'cout' in code:
+            analysis['insights'].append("Uses C++ iostream for formatted output")
+        if 'vector' in code_lower:
+            analysis['insights'].append("STL vectors provide dynamic array functionality with automatic memory management")
+        if 'std::' in code:
+            analysis['insights'].append("Explicitly uses std namespace for better code clarity")
+    elif language in ['java']:
+        if 'System.out' in code:
+            analysis['insights'].append("Uses standard output stream for console display")
+        if 'Scanner' in code:
+            analysis['insights'].append("Scanner class provides easy input parsing from various sources")
+        if 'public static void main' in code:
+            analysis['insights'].append("Main method serves as program entry point - required by JVM")
+    elif language in ['javascript', 'js']:
+        if 'console.log' in code:
+            analysis['insights'].append("console.log() provides output to browser console or Node.js terminal")
+        if 'let' in code or 'const' in code:
+            analysis['insights'].append("Uses ES6+ variable declarations for better scoping")
+    elif language in ['c']:
+        if 'printf' in code:
+            analysis['insights'].append("printf() provides formatted output with type specifiers")
+        if 'scanf' in code:
+            analysis['insights'].append("scanf() reads formatted input - requires format specifiers and address-of operator")
+    
+    # ALWAYS provide at least 2-3 general insights if none exist
+    if len(analysis['insights']) == 0:
+        analysis['insights'].append("Code follows structured programming principles")
+        analysis['insights'].append("Clear variable naming improves code readability")
+        if loop_depth > 0:
+            analysis['insights'].append("Loop structure enables repetitive operations efficiently")
+    
+    # Edge cases - ALWAYS provide edge cases for ALL languages
     if has_graph:
         analysis['edge_cases'].append("Disconnected components - some nodes unreachable")
         analysis['edge_cases'].append("Empty graph - no nodes or edges")
-    if 'len(' in code:
+    if 'len(' in code or '.length' in code or '.size()' in code:
         analysis['edge_cases'].append("Empty input - array/list with no elements")
     if '/' in code or 'divide' in code_lower:
         analysis['edge_cases'].append("Division by zero - need validation")
-    if '[0]' in code or 'first' in code_lower:
+    if '[0]' in code or 'first' in code_lower or '.get(0)' in code:
         analysis['edge_cases'].append("Index out of bounds - empty collection access")
     
-    # Optimizations
+    # Add language-specific edge cases
+    if language in ['c', 'cpp', 'c++']:
+        if 'cin' in code or 'scanf' in code:
+            analysis['edge_cases'].append("Invalid input type - user enters wrong data type")
+        if 'new' in code or 'malloc' in code:
+            analysis['edge_cases'].append("Memory allocation failure - insufficient RAM")
+        if 'pointer' in code_lower or '*' in code:
+            analysis['edge_cases'].append("Null pointer dereference - accessing invalid memory")
+    elif language in ['java']:
+        if 'Scanner' in code:
+            analysis['edge_cases'].append("InputMismatchException - wrong input type provided")
+        if 'Integer.parseInt' in code:
+            analysis['edge_cases'].append("NumberFormatException - invalid number format")
+    
+    # ALWAYS provide at least 2-3 general edge cases if none exist
+    if len(analysis['edge_cases']) == 0:
+        analysis['edge_cases'].append("Invalid input - data doesn't match expected format")
+        analysis['edge_cases'].append("Boundary conditions - minimum/maximum input values")
+        if 'int' in code_lower or 'integer' in code_lower:
+            analysis['edge_cases'].append("Integer overflow - result exceeds data type limits")
+    
+    # Optimizations - ALWAYS provide optimizations for ALL languages
     if loop_depth >= 2 and not has_dp:
         analysis['optimizations'].append("Consider using dynamic programming to reduce time complexity")
     if 'append' in code and 'for ' in code:
@@ -1282,23 +1511,65 @@ def deep_analyze_code(code, language):
     if has_dfs and not 'iterative' in code_lower:
         analysis['optimizations'].append("Iterative DFS with explicit stack to avoid recursion depth limit")
     
+    # Add language-specific optimizations
+    if language in ['cpp', 'c++']:
+        if 'endl' in code:
+            analysis['optimizations'].append("Use '\\n' instead of endl to avoid unnecessary buffer flushes")
+        if 'cout' in code and loop_depth > 0:
+            analysis['optimizations'].append("Cache I/O operations - consider buffered output for large data")
+    elif language in ['java']:
+        if 'String' in code and '+' in code and loop_depth > 0:
+            analysis['optimizations'].append("Use StringBuilder instead of String concatenation in loops")
+        if 'System.out.println' in code and loop_depth > 0:
+            analysis['optimizations'].append("Consider buffered output for better performance with many prints")
+    elif language in ['python']:
+        if 'append' in code and loop_depth > 0:
+            analysis['optimizations'].append("Use list comprehension for cleaner and faster code")
+    
+    # ALWAYS provide at least 2-3 general optimizations if none exist
+    if len(analysis['optimizations']) == 0:
+        analysis['optimizations'].append("Add input validation to handle edge cases gracefully")
+        analysis['optimizations'].append("Consider adding comments for complex logic")
+        if loop_depth == 0:
+            analysis['optimizations'].append("Code is already simple and efficient for its purpose")
+    
     return analysis
 
 
 def extract_function_names(code):
-    """Extract function names from code"""
+    """Extract function names from code (all languages)"""
     import re
-    matches = re.findall(r'def\s+(\w+)\s*\(', code)
-    return matches
+    # Python
+    py_matches = re.findall(r'def\s+(\w+)\s*\(', code)
+    # Java/C++/C/JavaScript
+    c_matches = re.findall(r'\b(?:void|int|String|boolean|char|float|double|long|short)\s+(\w+)\s*\(', code)
+    js_matches = re.findall(r'\bfunction\s+(\w+)\s*\(', code)
+    return py_matches + c_matches + js_matches
+
+
+def count_function_calls(code):
+    """Count how many times functions are called (for recursion detection)"""
+    import re
+    func_names = extract_function_names(code)
+    call_count = 0
+    for func in func_names:
+        # Count occurrences of function name followed by ( that are NOT the definition
+        pattern = r'\b' + re.escape(func) + r'\s*\('
+        all_matches = len(re.findall(pattern, code))
+        # Subtract 1 for the definition itself
+        if all_matches > 1:
+            call_count += (all_matches - 1)
+    return call_count
 
 
 def count_loop_depth(code):
-    """Count maximum nesting depth of loops"""
+    """Count maximum nesting depth of loops (all languages)"""
     max_depth = 0
     current_depth = 0
     for line in code.split('\n'):
         indent = len(line) - len(line.lstrip())
-        if 'for ' in line or 'while ' in line:
+        # Python/JavaScript/Java/C++/C style loops
+        if 'for ' in line or 'for(' in line or 'while ' in line or 'while(' in line:
             current_depth += 1
             max_depth = max(max_depth, current_depth)
         elif indent == 0 and line.strip():
@@ -1319,10 +1590,16 @@ def detect_dp_complexity(code):
 def generate_intelligent_steps(code, language, has_bfs, has_dfs, has_dp, has_graph, has_sorting):
     """
     Generate intelligent step-by-step explanation based on actual code structure.
-    This analyzes the code flow and creates meaningful steps.
+    SUPPORTS ALL LANGUAGES: Python, Java, C++, C, JavaScript
     """
     steps = []
     lines = [l for l in code.strip().split('\n') if l.strip()]
+    
+    # Language-specific patterns
+    is_python = language in ['python']
+    is_java = language in ['java']
+    is_cpp = language in ['cpp', 'c++', 'c']
+    is_js = language in ['javascript', 'js']
     
     # Group lines into logical sections
     current_section = []
@@ -1331,33 +1608,42 @@ def generate_intelligent_steps(code, language, has_bfs, has_dfs, has_dp, has_gra
     for i, line in enumerate(lines):
         stripped = line.strip()
         
-        # Detect section boundaries
-        if 'import ' in stripped or 'from ' in stripped:
+        # Detect section boundaries (multi-language)
+        # Imports/Includes
+        if ('import ' in stripped or 'from ' in stripped or '#include' in stripped or 'require(' in stripped):
             if current_section:
                 steps.append(create_step_from_section(current_section, section_type, language))
             current_section = [line]
             section_type = 'import'
-        elif stripped.startswith('def '):
+        # Function definitions (all languages)
+        elif (stripped.startswith('def ') or  # Python
+              'public ' in stripped or 'private ' in stripped or 'static ' in stripped or  # Java
+              'function ' in stripped or  # JavaScript
+              ('void' in stripped or 'int' in stripped or 'String' in stripped) and '(' in stripped):  # C/C++/Java
             if current_section:
                 steps.append(create_step_from_section(current_section, section_type, language))
             current_section = [line]
             section_type = 'function_def'
-        elif 'graph' in stripped.lower() and '=' in stripped:
+        # Graph initialization (all languages)
+        elif ('graph' in stripped.lower() or 'adj' in stripped.lower()) and '=' in stripped:
             if current_section:
                 steps.append(create_step_from_section(current_section, section_type, language))
             current_section = [line]
             section_type = 'graph_init'
-        elif ('for ' in stripped or 'while ' in stripped) and 'in ' in stripped:
+        # Loop detection (all languages)
+        elif ('for ' in stripped or 'for(' in stripped or 'while ' in stripped or 'while(' in stripped):
             if current_section and section_type != 'loop':
                 steps.append(create_step_from_section(current_section, section_type, language))
             current_section.append(line)
             section_type = 'loop'
-        elif 'if ' in stripped and section_type != 'loop':
+        # Condition detection (all languages)
+        elif ('if ' in stripped or 'if(' in stripped) and section_type != 'loop':
             if current_section:
                 steps.append(create_step_from_section(current_section, section_type, language))
             current_section = [line]
             section_type = 'condition'
-        elif 'return ' in stripped:
+        # Return statements (all languages)
+        elif 'return ' in stripped or 'return;' in stripped:
             current_section.append(line)
             steps.append(create_step_from_section(current_section, section_type, language))
             current_section = []
@@ -1368,93 +1654,192 @@ def generate_intelligent_steps(code, language, has_bfs, has_dfs, has_dp, has_gra
     if current_section:
         steps.append(create_step_from_section(current_section, section_type, language))
     
+    # FALLBACK: Ensure EVERY language gets detailed steps (minimum 3-5 steps)
+    if len(steps) < 3:
+        # If we have very few steps, add more detailed analysis
+        all_lines = '\n'.join(lines)
+        
+        # Add step for includes/imports if present
+        if any(kw in all_lines for kw in ['#include', 'import ', 'using', 'require(']):
+            if not any(s.get('title') == 'Load Required Libraries' for s in steps):
+                include_lines = [l for l in lines if any(kw in l for kw in ['#include', 'import ', 'using', 'require('])]
+                if include_lines:
+                    steps.insert(0, {
+                        'title': 'Load Required Libraries',
+                        'code_block': '\n'.join(include_lines),
+                        'explanation': 'Imports necessary libraries and modules that provide pre-built functionality. This allows the code to use external tools without reimplementing them.',
+                        'why': 'External libraries save development time and provide tested, optimized implementations.'
+                    })
+        
+        # Add step for main function/entry point
+        if 'main' in all_lines.lower() or 'def ' in all_lines or 'function ' in all_lines:
+            if not any('main' in s.get('title', '').lower() or 'function' in s.get('title', '').lower() for s in steps):
+                main_lines = [l for l in lines if 'main' in l.lower() or 'def ' in l or 'function ' in l]
+                if main_lines:
+                    steps.append({
+                        'title': 'Program Entry Point',
+                        'code_block': main_lines[0],
+                        'explanation': 'Defines the starting point of program execution. When the program runs, this is where it begins. This is required by most programming languages to know where to start.',
+                        'why': 'Every program needs a clear entry point for the runtime environment to begin execution.'
+                    })
+        
+        # Add step for variable declarations/initialization
+        if '=' in all_lines:
+            if not any('variable' in s.get('title', '').lower() or 'initialize' in s.get('title', '').lower() for s in steps):
+                var_lines = [l for l in lines if '=' in l and '==' not in l and '!=' not in l][:3]
+                if var_lines:
+                    steps.append({
+                        'title': 'Initialize Variables',
+                        'code_block': '\n'.join(var_lines),
+                        'explanation': 'Declares and initializes variables with starting values. Variables are named storage locations in memory that hold data during program execution.',
+                        'why': 'Proper initialization ensures variables have defined values before use, preventing unpredictable behavior.'
+                    })
+        
+        # Add step for output statements
+        if any(kw in all_lines for kw in ['cout', 'printf', 'println', 'print(', 'console.log']):
+            if not any('output' in s.get('title', '').lower() or 'display' in s.get('title', '').lower() or 'print' in s.get('title', '').lower() for s in steps):
+                output_lines = [l for l in lines if any(kw in l for kw in ['cout', 'printf', 'println', 'print(', 'console.log'])][:2]
+                if output_lines:
+                    steps.append({
+                        'title': 'Display Output',
+                        'code_block': '\n'.join(output_lines),
+                        'explanation': 'Outputs results to the console/terminal for the user to see. This is how programs communicate their results or status to users.',
+                        'why': 'Displaying output allows users to verify program behavior and see computed results.'
+                    })
+        
+        # Add step for input operations
+        if any(kw in all_lines for kw in ['cin', 'scanf', 'Scanner', 'input(', 'readline']):
+            if not any('input' in s.get('title', '').lower() or 'read' in s.get('title', '').lower() for s in steps):
+                input_lines = [l for l in lines if any(kw in l for kw in ['cin', 'scanf', 'Scanner', 'input(', 'readline'])][:2]
+                if input_lines:
+                    steps.append({
+                        'title': 'Read User Input',
+                        'code_block': '\n'.join(input_lines),
+                        'explanation': 'Reads data from the user or external source. Programs often need input to make decisions or perform calculations based on user-provided data.',
+                        'why': 'Input operations make programs interactive and adaptable to different scenarios.'
+                    })
+    
     return steps[:10]  # Limit to 10 steps for readability
 
 
 def create_step_from_section(lines, section_type, language):
-    """Create a step explanation from a code section"""
+    """Create a step explanation from a code section - SUPPORTS ALL LANGUAGES"""
     code_block = '\n'.join(lines)
+    code_lower = code_block.lower()
+    
+    # Detect BFS/Queue usage (multi-language)
+    has_queue = ('deque' in code_block or 'queue' in code_lower or 
+                 'Queue' in code_block or 'LinkedList' in code_block or
+                 'poll' in code_lower or 'offer' in code_lower)
     
     if section_type == 'graph_init':
+        # Language-specific graph explanations
+        if language in ['java']:
+            graph_type = "HashMap" if "HashMap" in code_block else "adjacency list"
+        elif language in ['cpp', 'c++', 'c']:
+            graph_type = "vector" if "vector" in code_block else "adjacency list"
+        elif language in ['javascript', 'js']:
+            graph_type = "Map" if "Map" in code_block else "object"
+        else:
+            graph_type = "dictionary" if "dict" in code_lower or "{}" in code_block else "adjacency list"
+        
         return {
             'title': 'Initialize Graph Structure',
             'code_block': code_block,
-            'explanation': 'Creates an adjacency list to represent the graph. Each key is a node, and its value is a list of neighboring nodes. This representation allows O(1) average-case access to neighbors.',
+            'explanation': f'Creates an adjacency list using {graph_type} to represent the graph. Each key/index is a node, and its value is a list of neighboring nodes. This representation allows O(1) average-case access to neighbors.',
             'why': 'Adjacency lists are efficient for sparse graphs and make traversal algorithms simple to implement.'
         }
-    elif section_type == 'loop' and 'deque' in code_block:
+    elif section_type == 'loop' and has_queue:
         return {
             'title': 'BFS Traversal',
             'code_block': code_block,
-            'explanation': 'Performs breadth-first search using a queue. Explores nodes level by level, ensuring shortest path discovery. Each node is visited once and marked in the distance dictionary.',
+            'explanation': 'Performs breadth-first search using a queue. Explores nodes level by level, ensuring shortest path discovery. Each node is visited once and marked as visited.',
             'why': 'BFS guarantees shortest path in unweighted graphs because it explores all nodes at distance k before exploring nodes at distance k+1.'
         }
     elif section_type == 'loop':
         return {
             'title': 'Iterate Through Data',
             'code_block': code_block,
-            'explanation': f'Loops through the collection processing each element. {analyze_loop_body(code_block)}',
+            'explanation': f'Loops through the collection processing each element. {analyze_loop_body(code_block, language)}',
             'why': 'Iteration is necessary to examine or transform each element in the data structure.'
         }
     elif section_type == 'condition':
         return {
             'title': 'Conditional Check',
             'code_block': code_block,
-            'explanation': f'Evaluates a condition and takes different paths based on the result. {extract_condition_logic(code_block)}',
+            'explanation': f'Evaluates a condition and takes different paths based on the result. {extract_condition_logic(code_block, language)}',
             'why': 'Handles different scenarios or edge cases in the algorithm.'
         }
     elif section_type == 'function_def':
         return {
             'title': 'Function Definition',
             'code_block': code_block,
-            'explanation': f'Defines a reusable function that encapsulates part of the algorithm. {extract_function_purpose(code_block)}',
+            'explanation': f'Defines a reusable function that encapsulates part of the algorithm. {extract_function_purpose(code_block, language)}',
             'why': 'Functions enable code reuse and make the algorithm more modular and testable.'
         }
     else:
         return {
             'title': 'Process Data',
             'code_block': code_block,
-            'explanation': f'Executes operations on the data. {summarize_operations(code_block)}',
+            'explanation': f'Executes operations on the data. {summarize_operations(code_block, language)}',
             'why': 'Necessary computation step in the algorithm.'
         }
 
 
-def analyze_loop_body(code):
-    """Analyze what happens inside a loop"""
-    if 'append' in code:
+def analyze_loop_body(code, language):
+    """Analyze what happens inside a loop - SUPPORTS ALL LANGUAGES"""
+    code_lower = code.lower()
+    
+    # Detect collection operations (multi-language)
+    has_add = ('append' in code or 'add(' in code or 'push(' in code or 
+               'push_back' in code or 'insert' in code)
+    has_condition = 'if ' in code or 'if(' in code
+    has_accumulation = '+=' in code or '-=' in code or '*=' in code or '/=' in code
+    
+    if has_add:
         return "Builds a new collection by adding elements one by one."
-    elif 'if ' in code:
+    elif has_condition:
         return "Applies conditional logic to filter or transform elements."
-    elif '+=' in code or '-=' in code:
+    elif has_accumulation:
         return "Accumulates values or maintains a running total."
     else:
         return "Processes each element with some operation."
 
 
-def extract_condition_logic(code):
-    """Extract the purpose of a conditional"""
-    if 'not in' in code:
+def extract_condition_logic(code, language):
+    """Extract the purpose of a conditional - SUPPORTS ALL LANGUAGES"""
+    code_lower = code.lower()
+    
+    # Multi-language pattern detection
+    has_not_in = 'not in' in code or '!contains' in code or '.find' in code or 'count' in code_lower
+    has_size_check = ('len(' in code or '.size()' in code or '.length' in code) and ('== 1' in code or '==1' in code)
+    has_zero_check = '== 0' in code or '==0' in code or 'not ' in code or '!' in code
+    
+    if has_not_in:
         return "Checks if an element hasn't been seen before (visited tracking)."
-    elif 'len(' in code and '== 1' in code:
+    elif has_size_check:
         return "Identifies elements with exactly one connection (leaf nodes)."
-    elif '== 0' in code or 'not ' in code:
+    elif has_zero_check:
         return "Handles the empty or base case."
     else:
         return "Evaluates a specific condition relevant to the algorithm."
 
 
-def extract_function_purpose(code):
-    """Determine what a function does"""
-    if 'return' in code and '+' in code:
+def extract_function_purpose(code, language):
+    """Determine what a function does - SUPPORTS ALL LANGUAGES"""
+    has_return = 'return ' in code or 'return;' in code
+    has_operation = '+' in code or '-' in code or '*' in code or '/' in code
+    
+    if has_return and has_operation:
         return "Combines or aggregates values to produce a result."
-    elif 'return' in code:
+    elif has_return:
         return "Computes and returns a value based on the input."
     else:
         return "Performs operations without returning a value."
 
 
-def summarize_operations(code):
-    """Summarize what operations are being performed"""
+def summarize_operations(code, language):
+    """Summarize what operations are being performed - SUPPORTS ALL LANGUAGES"""
     operations = []
     if '=' in code and '[' in code:
         operations.append("Initializes or updates data structures")
@@ -1548,41 +1933,111 @@ def analyze_lines_with_complexity(code, language):
 
 
 def explain_what(line, language):
-    """Explain what the line does"""
-    if 'def ' in line:
+    """Explain what the line does - SUPPORTS ALL LANGUAGES"""
+    line_lower = line.lower()
+    
+    # Function definitions (all languages)
+    if ('def ' in line or 'function ' in line or 
+        ('public ' in line and '(' in line) or ('private ' in line and '(' in line) or
+        ('void' in line and '(' in line) or ('int main' in line)):
         return "Function definition - creates reusable code block"
-    elif 'for ' in line or 'while ' in line:
+    
+    # Loops (all languages)
+    elif 'for ' in line or 'for(' in line or 'while ' in line or 'while(' in line:
         return "Loop statement - repeats code multiple times"
-    elif 'if ' in line:
+    
+    # Conditionals (all languages)
+    elif 'if ' in line or 'if(' in line or 'else' in line or 'switch' in line:
         return "Conditional check - makes decision"
+    
+    # Return statements (all languages)
     elif 'return' in line:
         return "Returns value back to caller"
-    elif 'print' in line or 'console.log' in line:
+    
+    # Output statements (multi-language)
+    elif ('print' in line or 'console.log' in line or 'System.out' in line or 
+          'cout' in line or 'printf' in line or 'Console.Write' in line):
         return "Output statement - displays result"
-    elif '=' in line and '==' not in line:
+    
+    # Input statements (multi-language)
+    elif ('input(' in line or 'Scanner' in line or 'cin' in line or 'scanf' in line):
+        return "Input statement - reads user data"
+    
+    # Class/Object creation (multi-language)
+    elif 'class ' in line or 'struct ' in line:
+        return "Class/Structure definition - defines custom data type"
+    elif 'new ' in line:
+        return "Object instantiation - creates new instance"
+    
+    # Assignment (all languages)
+    elif '=' in line and '==' not in line and '!=' not in line:
         return "Assignment - stores value in variable"
-    elif 'import' in line or 'include' in line:
+    
+    # Import/Include statements (all languages)
+    elif 'import ' in line or '#include' in line or 'using' in line or 'require(' in line:
         return "Import statement - loads external library"
+    
+    # Array/Collection operations
+    elif '.append(' in line or '.add(' in line or '.push(' in line or 'push_back' in line:
+        return "Collection operation - adds element to collection"
+    elif '.pop(' in line or '.remove(' in line:
+        return "Collection operation - removes element from collection"
+    
     else:
         return "Executes statement or expression"
 
 
 def explain_why(line, language):
-    """Explain why this line is needed"""
-    if 'def ' in line:
+    """Explain why this line is needed - SUPPORTS ALL LANGUAGES"""
+    line_lower = line.lower()
+    
+    # Function definitions (all languages)
+    if ('def ' in line or 'function ' in line or 
+        ('public ' in line and '(' in line) or ('private ' in line and '(' in line) or
+        ('void' in line and '(' in line) or ('int main' in line)):
         return "Enables code reuse and organization"
-    elif 'for ' in line or 'while ' in line:
+    
+    # Loops (all languages)
+    elif 'for ' in line or 'for(' in line or 'while ' in line or 'while(' in line:
         return "Processes multiple items or repeats until condition met"
-    elif 'if ' in line:
+    
+    # Conditionals (all languages)
+    elif 'if ' in line or 'if(' in line or 'else' in line or 'switch' in line:
         return "Handles different scenarios based on conditions"
+    
+    # Return statements
     elif 'return' in line:
         return "Provides result to be used elsewhere"
-    elif 'print' in line or 'console.log' in line:
+    
+    # Output statements (multi-language)
+    elif ('print' in line or 'console.log' in line or 'System.out' in line or 
+          'cout' in line or 'printf' in line):
         return "Shows results to user for verification/debugging"
-    elif '=' in line and '==' not in line:
+    
+    # Input statements (multi-language)
+    elif ('input(' in line or 'Scanner' in line or 'cin' in line or 'scanf' in line):
+        return "Collects data from user for processing"
+    
+    # Class/Object creation
+    elif 'class ' in line or 'struct ' in line:
+        return "Encapsulates related data and behavior"
+    elif 'new ' in line:
+        return "Allocates memory and initializes object state"
+    
+    # Assignment
+    elif '=' in line and '==' not in line and '!=' not in line:
         return "Stores data for later use in program"
-    elif 'import' in line or 'include' in line:
+    
+    # Import/Include
+    elif 'import ' in line or '#include' in line or 'using' in line or 'require(' in line:
         return "Adds functionality from external code"
+    
+    # Collection operations
+    elif '.append(' in line or '.add(' in line or '.push(' in line or 'push_back' in line:
+        return "Builds or modifies data collection"
+    elif '.pop(' in line or '.remove(' in line:
+        return "Removes processed or unnecessary elements"
+    
     else:
         return "Performs necessary computation or operation"
 
@@ -2225,7 +2680,115 @@ def explain_html():
 
 # ---------------- AI OPTIMIZER ----------------
 
-def ai_optimize_python(code):
+def ai_optimize_code(code, language):
+    """
+    AI-powered code optimizer using Google Gemini API.
+    Works for ALL languages: Python, JavaScript, Java, C++, C, etc.
+    Returns optimized code with detailed explanations.
+    """
+    if not gemini_model:
+        # Fallback to old optimizer if API not available
+        if language == "python":
+            return ai_optimize_python_fallback(code)
+        else:
+            return {
+                "optimized_code": code,
+                "optimizations": [{
+                    "change": "AI API not configured",
+                    "description": "Add GEMINI_API_KEY to .env file to enable AI optimization",
+                    "benefit": "Intelligent optimization for all languages"
+                }]
+            }
+    
+    try:
+        prompt = f"""You are an expert code optimizer. Analyze this {language} code and provide optimizations.
+
+**IMPORTANT INSTRUCTIONS:**
+1. Return ONLY valid JSON (no markdown, no backticks, no extra text)
+2. Provide actual optimized code, not just suggestions
+3. Focus on: performance, readability, best practices, algorithm efficiency
+4. If code is already optimal, make minor improvements and explain
+
+**Code to optimize:**
+```{language}
+{code}
+```
+
+**Return this EXACT JSON format:**
+{{
+  "optimized_code": "the complete optimized code here",
+  "optimizations": [
+    {{
+      "change": "Brief title of what changed",
+      "description": "Detailed explanation of the optimization",
+      "benefit": "What improvement this brings (performance/readability/maintainability)"
+    }}
+  ]
+}}
+
+Focus on real optimizations like:
+- Algorithm complexity improvements (O(n²) → O(n log n))
+- Removing redundant operations
+- Better data structures (list → set, loops → comprehensions)
+- Memory efficiency
+- Language-specific best practices
+- Code readability improvements
+
+Return ONLY the JSON, nothing else."""
+
+        response = gemini_model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean up response (remove markdown code blocks if present)
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        
+        # Parse JSON response
+        result = json.loads(response_text)
+        
+        # Validate response format
+        if "optimized_code" not in result or "optimizations" not in result:
+            raise ValueError("Invalid response format from AI")
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON parsing error: {e}")
+        print(f"Response was: {response_text[:500]}")
+        # Fallback to old optimizer
+        if language == "python":
+            return ai_optimize_python_fallback(code)
+        else:
+            return {
+                "optimized_code": code,
+                "optimizations": [{
+                    "change": "Optimization analysis failed",
+                    "description": "Could not parse AI response. Try again or check your code syntax.",
+                    "benefit": "Error in AI processing"
+                }]
+            }
+    except Exception as e:
+        print(f"AI optimization error: {e}")
+        # Fallback to old optimizer
+        if language == "python":
+            return ai_optimize_python_fallback(code)
+        else:
+            return {
+                "optimized_code": code,
+                "optimizations": [{
+                    "change": "Optimization failed",
+                    "description": f"Error: {str(e)}",
+                    "benefit": "Please try again"
+                }]
+            }
+
+
+def ai_optimize_python_fallback(code):
     """
     AI-powered code optimizer that provides detailed optimization explanations.
     Returns optimized code and a list of optimizations made.
@@ -2439,6 +3002,103 @@ def format_detailed_issues(bugs_found, code_lines):
 def ai_debug_code(code, language, issues):
     """
     AI-powered intelligent debugging that analyzes logical errors, not just syntax.
+    Enhanced with Google Gemini AI for deeper analysis.
+    """
+    # Try AI-powered debugging first if available
+    if gemini_model and language in ['python', 'javascript', 'java', 'cpp', 'c']:
+        ai_result = ai_enhance_debug(code, language, issues)
+        if ai_result:
+            return ai_result
+    
+    # Fallback to rule-based debugging
+    return rule_based_debug(code, language, issues)
+
+
+def ai_enhance_debug(code, language, linter_issues):
+    """
+    Use AI to provide intelligent bug detection and fixes.
+    Combines linter output with AI insights.
+    """
+    try:
+        # Prepare linter context
+        linter_context = ""
+        if linter_issues and not linter_issues.startswith("✅"):
+            linter_context = f"\n\nLinter detected these issues:\n{linter_issues}"
+        
+        prompt = f"""You are an expert code debugger. Analyze this {language} code for bugs and issues.
+
+**Code:**
+```{language}
+{code}
+```
+{linter_context}
+
+**Return ONLY valid JSON with this structure:**
+{{
+  "bugs_found": [
+    {{
+      "line": 0,
+      "type": "Bug category",
+      "severity": "high/medium/low",
+      "message": "Clear explanation of the issue",
+      "code": "the problematic line of code",
+      "fix": "suggested fix (optional)"
+    }}
+  ],
+  "fixed_code": "complete corrected code here",
+  "suggestions": [
+    "Best practice suggestion 1",
+    "Best practice suggestion 2"
+  ],
+  "confidence": "high/medium/low"
+}}
+
+Look for:
+- Syntax errors (missing colons, parentheses, brackets)
+- Logic errors (infinite loops, wrong operators, off-by-one)
+- Runtime errors (null/undefined access, division by zero)
+- Type errors (wrong data types)
+- Edge cases not handled
+- Performance issues
+- Security vulnerabilities
+
+Be specific about line numbers and provide actionable fixes. Return ONLY the JSON."""
+
+        response = gemini_model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Clean up response
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        
+        # Parse JSON
+        result = json.loads(response_text)
+        
+        # Validate structure
+        if "bugs_found" not in result:
+            result["bugs_found"] = []
+        if "suggestions" not in result:
+            result["suggestions"] = []
+        if "fixed_code" not in result:
+            result["fixed_code"] = code
+        if "confidence" not in result:
+            result["confidence"] = "medium"
+        
+        return result
+        
+    except Exception as e:
+        print(f"AI debug error: {e}")
+        return None
+
+
+def rule_based_debug(code, language, issues):
+    """
+    Rule-based intelligent debugging (fallback when AI is not available).
     Uses GPT-like analysis to find bugs and suggest fixes.
     """
     analysis = {

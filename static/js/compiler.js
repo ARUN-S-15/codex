@@ -1,14 +1,190 @@
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Compiler.js loaded successfully!");
   
+  // ============================================
+  // CODEMIRROR INITIALIZATION (Single Unified Editor)
+  // ============================================
+  const codeEditorTextarea = document.getElementById("codeEditor");
+  
+  // Language mode mapping for CodeMirror
+  const languageModeMap = {
+    "71": "python",        // Python
+    "63": "javascript",    // JavaScript (Node.js)
+    "62": "text/x-java",   // Java
+    "54": "text/x-c++src", // C++
+    "50": "text/x-csrc",   // C
+    "51": "text/x-csharp", // C#
+    "60": "text/x-go"      // Go
+  };
+  
+  // Initialize CodeMirror
+  const codeMirrorEditor = CodeMirror.fromTextArea(codeEditorTextarea, {
+    mode: "python",  // Default to Python
+    theme: "monokai",
+    lineNumbers: true,
+    autofocus: true,
+    indentUnit: 4,
+    tabSize: 4,
+    lineWrapping: true,
+    autoCloseBrackets: true,
+    matchBrackets: true,
+    styleActiveLine: true,
+    extraKeys: {
+      // Basic editing
+      "Tab": (cm) => cm.execCommand("indentMore"),
+      "Shift-Tab": (cm) => cm.execCommand("indentLess"),
+      
+      // IDE Shortcuts
+      "F9": (cm) => { 
+        if (runBtn) { 
+          runBtn.click(); 
+          return false; 
+        } 
+      },
+      "F8": (cm) => { 
+        if (debugBtn) { 
+          debugBtn.click(); 
+          return false; 
+        } 
+      },
+      "Ctrl-S": (cm) => { 
+        if (saveBtn) { 
+          saveBtn.click(); 
+        }
+        return false; 
+      },
+      "Ctrl-M": (cm) => { 
+        if (newCodeBtn) { 
+          newCodeBtn.click(); 
+          return false; 
+        } 
+      },
+      
+      // Copy/Duplicate line up
+      "Alt-Shift-Up": (cm) => {
+        const cursor = cm.getCursor();
+        const line = cm.getLine(cursor.line);
+        cm.replaceRange(line + "\n", {line: cursor.line, ch: 0});
+        cm.setCursor({line: cursor.line, ch: cursor.ch});
+      },
+      
+      // Copy/Duplicate line down
+      "Alt-Shift-Down": (cm) => {
+        const cursor = cm.getCursor();
+        const line = cm.getLine(cursor.line);
+        cm.replaceRange("\n" + line, {line: cursor.line, ch: line.length});
+        cm.setCursor({line: cursor.line + 1, ch: cursor.ch});
+      },
+      
+      // Move line up
+      "Alt-Up": (cm) => {
+        const cursor = cm.getCursor();
+        if (cursor.line === 0) return;
+        const line = cm.getLine(cursor.line);
+        const prevLine = cm.getLine(cursor.line - 1);
+        cm.replaceRange(line + "\n" + prevLine, {line: cursor.line - 1, ch: 0}, {line: cursor.line + 1, ch: 0});
+        cm.setCursor({line: cursor.line - 1, ch: cursor.ch});
+      },
+      
+      // Move line down
+      "Alt-Down": (cm) => {
+        const cursor = cm.getCursor();
+        if (cursor.line === cm.lineCount() - 1) return;
+        const line = cm.getLine(cursor.line);
+        const nextLine = cm.getLine(cursor.line + 1);
+        cm.replaceRange(nextLine + "\n" + line, {line: cursor.line, ch: 0}, {line: cursor.line + 2, ch: 0});
+        cm.setCursor({line: cursor.line + 1, ch: cursor.ch});
+      },
+      
+      // Comment toggle
+      "Ctrl-/": (cm) => {
+        cm.toggleComment();
+      },
+      
+      // Delete line
+      "Ctrl-D": (cm) => {
+        const cursor = cm.getCursor();
+        cm.replaceRange("", {line: cursor.line, ch: 0}, {line: cursor.line + 1, ch: 0});
+      },
+      
+      // Duplicate selection/line
+      "Ctrl-Shift-D": (cm) => {
+        if (cm.somethingSelected()) {
+          const selections = cm.getSelections();
+          cm.replaceSelections(selections.concat(selections));
+        } else {
+          const cursor = cm.getCursor();
+          const line = cm.getLine(cursor.line);
+          cm.replaceRange("\n" + line, {line: cursor.line, ch: line.length});
+          cm.setCursor({line: cursor.line + 1, ch: cursor.ch});
+        }
+      },
+      
+      // Find and replace
+      "Ctrl-F": "find",
+      "Ctrl-H": "replace",
+      "Ctrl-G": "findNext",
+      "Ctrl-Shift-G": "findPrev",
+      
+      // Go to line
+      "Ctrl-L": (cm) => {
+        const line = prompt("Go to line:", "");
+        if (line) {
+          cm.setCursor(parseInt(line) - 1, 0);
+        }
+      },
+      
+      // Select all
+      "Ctrl-A": "selectAll",
+      
+      // Undo/Redo
+      "Ctrl-Z": "undo",
+      "Ctrl-Y": "redo",
+      "Ctrl-Shift-Z": "redo",
+      
+      // Upper/Lower case
+      "Ctrl-U": (cm) => {
+        const selections = cm.getSelections();
+        cm.replaceSelections(selections.map(s => s.toUpperCase()));
+      },
+      "Ctrl-Shift-U": (cm) => {
+        const selections = cm.getSelections();
+        cm.replaceSelections(selections.map(s => s.toLowerCase()));
+      }
+    }
+  });
+  
+  // Function to get comment character based on language
+  function getCommentChar(mode) {
+    if (mode.includes("python")) return "#";
+    if (mode.includes("javascript") || mode.includes("java") || mode.includes("c")) return "//";
+    return "#";
+  }
+  
+  // Create a wrapper for CodeMirror to maintain compatibility with old code
+  const codeEditor = {
+    get value() {
+      return codeMirrorEditor.getValue();
+    },
+    set value(text) {
+      codeMirrorEditor.setValue(text);
+    },
+    focus() {
+      codeMirrorEditor.focus();
+    }
+  };
+  
+  console.log("✅ CodeMirror initialized successfully!");
+  
+  // ============================================
+  // UI ELEMENTS
+  // ============================================
   const runBtn = document.getElementById("runBtn");
   const explainBtn = document.getElementById("explainBtn");
   const debugBtn = document.getElementById("debugBtn");
   const saveBtn = document.getElementById("saveBtn");
   const shareBtn = document.getElementById("shareBtn");
   const newCodeBtn = document.getElementById("newCodeBtn");
-
-  const codeEditor = document.getElementById("codeEditor");
   const languageSelect = document.getElementById("languageSelect");
   
   console.log("✅ Elements found:", {
@@ -38,14 +214,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const sharedTitle = sessionStorage.getItem('sharedTitle');
   
   if (sharedCode) {
-    codeEditor.value = sharedCode;
+    codeMirrorEditor.setValue(sharedCode);
     // Clear session storage after loading
     sessionStorage.removeItem('sharedCode');
     sessionStorage.removeItem('sharedLanguage');
     sessionStorage.removeItem('sharedTitle');
-    
-    updateSyntaxHighlight();
-    updateLineNumbers();
     
     alert(`✅ Loaded shared code: "${sharedTitle}"`);
   }
@@ -53,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---- NEW CODE BUTTON ----
   if (newCodeBtn) {
     newCodeBtn.addEventListener('click', () => {
-      const currentCode = codeEditor.value.trim();
+      const currentCode = codeMirrorEditor.getValue().trim();
       
       // If there's code, ask for confirmation
       if (currentCode && !confirm("Clear current code? (Unsaved changes will be lost)")) {
@@ -61,9 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       // Clear the editor
-      codeEditor.value = "";
-      updateSyntaxHighlight();
-      updateLineNumbers();
+      codeMirrorEditor.setValue("");
       
       // Hide result sections
       if (resultSection) resultSection.classList.add("hidden");
@@ -768,8 +939,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const highlightedCode = document.getElementById("highlightedCode");
   const syntaxHighlight = document.getElementById("syntaxHighlight");
   
-  // Map language IDs to Prism language classes
-  const languageMap = {
+  // Map language IDs to language names (for Judge0 API)
+  const judge0LanguageMap = {
     "71": "python",
     "50": "c",
     "54": "cpp",
@@ -777,183 +948,41 @@ document.addEventListener("DOMContentLoaded", () => {
     "62": "java"
   };
   
+  // Compatibility stubs - CodeMirror handles these automatically
   function updateLineNumbers() {
-    if (!codeEditor || !lineNumbers) return;
-    
-    const lines = codeEditor.value.split('\n');
-    const lineCount = lines.length;
-    
-    // Generate line numbers
-    let numbersHTML = '';
-    for (let i = 1; i <= lineCount; i++) {
-      numbersHTML += i + '\n';
-    }
-    lineNumbers.textContent = numbersHTML;
+    // No longer needed - CodeMirror handles line numbers
   }
   
   function updateSyntaxHighlight() {
-    if (!codeEditor || !highlightedCode) {
-      console.log("Missing elements:", { codeEditor: !!codeEditor, highlightedCode: !!highlightedCode });
-      return;
-    }
-    
-    const code = codeEditor.value;
-    const languageId = languageSelect.value;
-    const language = languageMap[languageId] || "python";
-    
-    // Update language class
-    highlightedCode.className = `language-${language}`;
-    
-    // Set text content (this makes text visible even without Prism)
-    highlightedCode.textContent = code;
-    
-    // Apply Prism highlighting if available
-    if (window.Prism) {
-      try {
-        Prism.highlightElement(highlightedCode);
-      } catch (e) {
-        console.error("Prism highlighting error:", e);
-      }
-    } else {
-      console.log("Prism not loaded yet");
-    }
+    // No longer needed - CodeMirror handles syntax highlighting
   }
   
   function syncScroll() {
-    if (syntaxHighlight && codeEditor) {
-      syntaxHighlight.scrollTop = codeEditor.scrollTop;
-      syntaxHighlight.scrollLeft = codeEditor.scrollLeft;
-    }
-    if (lineNumbers && codeEditor) {
-      lineNumbers.scrollTop = codeEditor.scrollTop;
-    }
+    // No longer needed - CodeMirror handles scrolling
   }
 
-  // ---- AUTO-COMPLETION FOR BRACKETS, QUOTES ----
-  if (codeEditor) {
-    codeEditor.addEventListener('keydown', (e) => {
-      const start = codeEditor.selectionStart;
-      const end = codeEditor.selectionEnd;
-      const value = codeEditor.value;
-      
-      // Auto-close brackets, quotes, etc.
-      const pairs = {
-        '(': ')',
-        '[': ']',
-        '{': '}',
-        '"': '"',
-        "'": "'",
-        '`': '`'
-      };
-      
-      if (pairs[e.key]) {
-        e.preventDefault();
-        const closingChar = pairs[e.key];
-        
-        // Insert opening and closing characters
-        const newValue = value.substring(0, start) + e.key + closingChar + value.substring(end);
-        codeEditor.value = newValue;
-        
-        // Move cursor between the pair
-        codeEditor.selectionStart = codeEditor.selectionEnd = start + 1;
-        
-        // Update UI
-        updateLineNumbers();
-        updateSyntaxHighlight();
-        return;
-      }
-      
-      // Handle Enter key for auto-indentation
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        
-        const lines = value.substring(0, start).split('\n');
-        const currentLine = lines[lines.length - 1];
-        
-        // Calculate current indentation
-        const indent = currentLine.match(/^\s*/)[0];
-        
-        // Check if current line ends with characters that require extra indent
-        const trimmedLine = currentLine.trim();
-        const needsExtraIndent = /[\(\[\{:]$/.test(trimmedLine);
-        
-        // Determine new indentation
-        let newIndent = indent;
-        if (needsExtraIndent) {
-          newIndent = indent + '    '; // Add 4 spaces (1 tab)
-        }
-        
-        // Insert newline with indentation
-        const newValue = value.substring(0, start) + '\n' + newIndent + value.substring(end);
-        codeEditor.value = newValue;
-        
-        // Move cursor to end of indentation
-        codeEditor.selectionStart = codeEditor.selectionEnd = start + 1 + newIndent.length;
-        
-        // Update UI
-        updateLineNumbers();
-        updateSyntaxHighlight();
-        return;
-      }
-      
-      // Handle Tab key for indentation
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        
-        // Insert 4 spaces
-        const newValue = value.substring(0, start) + '    ' + value.substring(end);
-        codeEditor.value = newValue;
-        
-        // Move cursor after the tab
-        codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
-        
-        // Update UI
-        updateLineNumbers();
-        updateSyntaxHighlight();
-        return;
-      }
-      
-      // Handle Backspace to delete matching closing bracket/quote
-      if (e.key === 'Backspace') {
-        const charBefore = value.charAt(start - 1);
-        const charAfter = value.charAt(start);
-        
-        // Check if we're deleting an opening bracket/quote with matching closing one
-        if (pairs[charBefore] && pairs[charBefore] === charAfter && start === end) {
-          e.preventDefault();
-          
-          // Delete both characters
-          const newValue = value.substring(0, start - 1) + value.substring(start + 1);
-          codeEditor.value = newValue;
-          
-          // Move cursor back
-          codeEditor.selectionStart = codeEditor.selectionEnd = start - 1;
-          
-          // Update UI
-          updateLineNumbers();
-          updateSyntaxHighlight();
-          return;
-        }
-      }
-    });
-  }
-
-  // Update on input and language change
-  if (codeEditor) {
-    codeEditor.addEventListener('input', () => {
-      updateLineNumbers();
-      updateSyntaxHighlight();
-    });
-    
-    codeEditor.addEventListener('scroll', syncScroll);
-    
-    // Initial update
-    updateLineNumbers();
-    updateSyntaxHighlight();
-  }
+  // ============================================
+  // AUTO-BRACKET & INDENTATION
+  // ============================================
+  // CodeMirror handles all of this automatically via:
+  // - autoCloseBrackets option
+  // - matchBrackets option
+  // - Built-in indentation logic
+  // No manual event listeners needed!
   
+  // ============================================
+  // LANGUAGE CHANGE HANDLER
+  // ============================================
   if (languageSelect) {
-    languageSelect.addEventListener('change', updateSyntaxHighlight);
+    languageSelect.addEventListener('change', () => {
+      const languageId = languageSelect.value;
+      const mode = languageModeMap[languageId] || "python";
+      
+      // Update CodeMirror mode
+      codeMirrorEditor.setOption("mode", mode);
+      
+      console.log(`✅ Language changed to: ${mode}`);
+    });
   }
 
   // ---- COPY BUTTON ----

@@ -6,14 +6,21 @@
   <title>CODEX - Debug Code</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- Prism.js for Syntax Highlighting -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+  <!-- CodeMirror Editor -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/comment/comment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/selection/active-line.min.js"></script>
   
   <style>
     .issues-grid {
@@ -170,53 +177,82 @@
       word-spacing: 0;
     }
 
-    textarea {
+    /* CodeMirror Editor Styles */
+    .CodeMirror {
+      height: 80vh !important;
+      min-height: 80vh;
+      font-size: 1.1rem !important;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+      background: #1d1d1d !important;
+      color: #ececf1 !important;
+      border-radius: 8px;
+    }
+    
+    .CodeMirror-gutters {
+      background: #2a2b32 !important;
+      border-right: 1px solid #3a3b42 !important;
+    }
+    
+    .CodeMirror-linenumber {
+      color: #9ca3af !important;
+      padding: 0 0.8rem !important;
+    }
+    
+    .CodeMirror-cursor {
+      border-left: 2px solid #10a37f !important;
+    }
+    
+    .CodeMirror-selected {
+      background: rgba(16, 163, 127, 0.3) !important;
+    }
+    
+    .CodeMirror-line {
+      padding: 0 0.5rem !important;
+      line-height: 1.8 !important;
+    }
+    
+    .CodeMirror-lines {
+      padding: 8px 0 !important;
+    }
+    
+    .editor-container {
       position: relative;
-      flex: 1;
-      background: transparent;
-      color: transparent;
-      border: none;
-      border-radius: 0 10px 10px 0;
-      padding: 1rem;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 1.1rem;
-      resize: none;
-      outline: none;
-      line-height: 1.7rem;
-      tab-size: 4;
-      caret-color: #ececf1;
-      -webkit-text-fill-color: transparent;
-      z-index: 1;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      letter-spacing: 0;
-      word-spacing: 0;
-    }
-    
-    textarea::placeholder {
-      color: #666;
-      -webkit-text-fill-color: #666;
-    }
-    
-    textarea::selection {
-      background: rgba(16, 163, 127, 0.3);
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .copy-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 0.3rem 0.7rem;
-      background: #10a37f;
-      color: #fff;
-      border: none;
+      top: 0.6rem;
+      right: 0.6rem;
+      background: rgba(42, 43, 50, 0.95);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      color: #c9d1d9;
+      padding: 0.4rem 0.9rem;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      z-index: 1000;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      backdrop-filter: blur(10px);
     }
 
     .copy-btn:hover {
-      background: #0d8b6d;
+      background: rgba(88, 166, 255, 0.15);
+      border-color: #58a6ff;
+      color: #58a6ff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.2);
+    }
+    
+    .copy-btn:active {
+      transform: translateY(0);
     }
 
     #debugBtn {
@@ -412,13 +448,9 @@
     <!-- Debugged Code Section (Left) -->
     <div class="editor-section">
       <h3 style="color: #10a37f; margin-bottom: 0.5rem;">✨ Debugged Code (Editable)</h3>
-      <div class="editor-wrapper">
-        <div class="line-numbers" id="lineNumbers">1</div>
-        <div class="code-wrapper">
-          <pre class="syntax-highlight" id="syntaxHighlight"><code id="highlightedCode" class="language-python"></code></pre>
-          <textarea id="codeInput" placeholder="Auto-fixed code will appear here..."></textarea>
-        </div>
-        <button class="copy-btn" id="copyFixedBtn">Copy</button>
+      <div class="editor-container">
+        <button class="copy-btn" id="copyFixedBtn">📋 Copy code</button>
+        <textarea id="codeInput"></textarea>
       </div>
       <button id="debugBtn">🐞 Analyze & Debug Code</button>
     </div>
@@ -431,7 +463,7 @@
           <div id="issues" style="height: 100%; overflow: auto; background: #1d1d1d; border-radius: 10px;">
             <p style="padding: 2rem; text-align: center; color: #888;">Paste code and click "Analyze & Debug Code" to see issues.</p>
           </div>
-          <button class="copy-btn" id="copyIssuesBtn">Copy</button>
+          <button class="copy-btn" id="copyIssuesBtn">📋 Copy issues</button>
         </div>
       </div>
     </div>
@@ -443,26 +475,125 @@
   </footer>
 
   <script>
-  const codeInput = document.getElementById("codeInput");
-  const lineNumbers = document.getElementById("lineNumbers");
   const debugBtn = document.getElementById("debugBtn");
   const issuesBox = document.getElementById("issues");
   const results = document.getElementById("results");
   const historyBox = document.getElementById("historyBox");
-  const highlightedCode = document.getElementById("highlightedCode");
-  const syntaxHighlight = document.getElementById("syntaxHighlight");
+  const codeInputTextarea = document.getElementById("codeInput");
 
   let currentLanguage = "python"; // default
   let originalCode = ""; // Store original code
   
-  // Map language names to Prism classes
-  const languageMap = {
+  // ============================================
+  // CODEMIRROR INITIALIZATION
+  // ============================================
+  const languageModeMap = {
     "python": "python",
     "javascript": "javascript",
-    "c": "c",
-    "cpp": "cpp",
-    "c++": "cpp",
-    "java": "java"
+    "java": "text/x-java",
+    "cpp": "text/x-c++src",
+    "c++": "text/x-c++src",
+    "c": "text/x-csrc"
+  };
+  
+  // Initialize CodeMirror
+  const codeMirrorEditor = CodeMirror.fromTextArea(codeInputTextarea, {
+    mode: "python",
+    theme: "monokai",
+    lineNumbers: true,
+    autofocus: true,
+    indentUnit: 4,
+    tabSize: 4,
+    lineWrapping: true,
+    autoCloseBrackets: true,
+    matchBrackets: true,
+    styleActiveLine: true,
+    extraKeys: {
+      "Tab": (cm) => cm.execCommand("indentMore"),
+      "Shift-Tab": (cm) => cm.execCommand("indentLess"),
+      "F8": (cm) => { 
+        if (debugBtn) { 
+          debugBtn.click(); 
+          return false; 
+        } 
+      },
+      "Alt-Shift-Up": (cm) => {
+        const cursor = cm.getCursor();
+        const line = cm.getLine(cursor.line);
+        cm.replaceRange(line + "\n", {line: cursor.line, ch: 0});
+        cm.setCursor({line: cursor.line, ch: cursor.ch});
+      },
+      "Alt-Shift-Down": (cm) => {
+        const cursor = cm.getCursor();
+        const line = cm.getLine(cursor.line);
+        cm.replaceRange("\n" + line, {line: cursor.line, ch: line.length});
+        cm.setCursor({line: cursor.line + 1, ch: cursor.ch});
+      },
+      "Alt-Up": (cm) => {
+        const cursor = cm.getCursor();
+        if (cursor.line === 0) return;
+        const line = cm.getLine(cursor.line);
+        const prevLine = cm.getLine(cursor.line - 1);
+        cm.replaceRange(line + "\n" + prevLine, {line: cursor.line - 1, ch: 0}, {line: cursor.line + 1, ch: 0});
+        cm.setCursor({line: cursor.line - 1, ch: cursor.ch});
+      },
+      "Alt-Down": (cm) => {
+        const cursor = cm.getCursor();
+        if (cursor.line === cm.lineCount() - 1) return;
+        const line = cm.getLine(cursor.line);
+        const nextLine = cm.getLine(cursor.line + 1);
+        cm.replaceRange(nextLine + "\n" + line, {line: cursor.line, ch: 0}, {line: cursor.line + 2, ch: 0});
+        cm.setCursor({line: cursor.line + 1, ch: cursor.ch});
+      },
+      "Ctrl-/": (cm) => {
+        cm.toggleComment();
+      },
+      "Ctrl-D": (cm) => {
+        const cursor = cm.getCursor();
+        cm.replaceRange("", {line: cursor.line, ch: 0}, {line: cursor.line + 1, ch: 0});
+      },
+      "Ctrl-Shift-D": (cm) => {
+        if (cm.somethingSelected()) {
+          const selections = cm.getSelections();
+          cm.replaceSelections(selections.concat(selections));
+        } else {
+          const cursor = cm.getCursor();
+          const line = cm.getLine(cursor.line);
+          cm.replaceRange("\n" + line, {line: cursor.line, ch: line.length});
+          cm.setCursor({line: cursor.line + 1, ch: cursor.ch});
+        }
+      },
+      "Ctrl-F": "find",
+      "Ctrl-H": "replace",
+      "Ctrl-G": "findNext",
+      "Ctrl-Shift-G": "findPrev",
+      "Ctrl-L": (cm) => {
+        const line = prompt("Go to line:", "");
+        if (line) {
+          cm.setCursor(parseInt(line) - 1, 0);
+        }
+      },
+      "Ctrl-A": "selectAll",
+      "Ctrl-Z": "undo",
+      "Ctrl-Y": "redo",
+      "Ctrl-Shift-Z": "redo",
+      "Ctrl-U": (cm) => {
+        const selections = cm.getSelections();
+        cm.replaceSelections(selections.map(s => s.toUpperCase()));
+      },
+      "Ctrl-Shift-U": (cm) => {
+        const selections = cm.getSelections();
+        cm.replaceSelections(selections.map(s => s.toLowerCase()));
+      }
+    }
+  });
+  
+  // Wrapper for compatibility with existing code
+  const codeInput = {
+    get value() { return codeMirrorEditor.getValue(); },
+    set value(text) { codeMirrorEditor.setValue(text); },
+    addEventListener: () => {}, // Stub for compatibility
+    scrollTop: 0
   };
 
   // Load code from localStorage if available (sent from compiler page)
@@ -472,10 +603,13 @@
     
     if (savedCode) {
       originalCode = savedCode;
+      codeMirrorEditor.setValue(savedCode);
       
-      // Detect language
+      // Detect and set language mode
       if (savedLanguage) {
         currentLanguage = savedLanguage.toLowerCase();
+        const mode = languageModeMap[currentLanguage] || "python";
+        codeMirrorEditor.setOption("mode", mode);
       }
       
       // Auto-run debug analysis
@@ -491,42 +625,10 @@
     }
   });
 
-  // Line numbers update
-  function updateLineNumbers() {
-    const lines = codeInput.value.split("\n").length;
-    lineNumbers.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
-  }
-  
-  // Update syntax highlighting
-  function updateSyntaxHighlight() {
-    const code = codeInput.value;
-    const language = languageMap[currentLanguage.toLowerCase()] || "python";
-    
-    highlightedCode.className = `language-${language}`;
-    highlightedCode.textContent = code;
-    
-    if (window.Prism) {
-      Prism.highlightElement(highlightedCode);
-    }
-  }
-  
-  // Sync scroll
-  function syncScroll() {
-    if (syntaxHighlight && codeInput) {
-      syntaxHighlight.scrollTop = codeInput.scrollTop;
-      syntaxHighlight.scrollLeft = codeInput.scrollLeft;
-    }
-    if (lineNumbers && codeInput) {
-      lineNumbers.scrollTop = codeInput.scrollTop;
-    }
-  }
-
-  codeInput.addEventListener("input", () => {
-    updateLineNumbers();
-    updateSyntaxHighlight();
-  });
-  
-  codeInput.addEventListener("scroll", syncScroll);
+  // Old functions replaced by CodeMirror
+  function updateLineNumbers() {} // CodeMirror handles this
+  function updateSyntaxHighlight() {} // CodeMirror handles this
+  function syncScroll() {} // CodeMirror handles this
 
   // Format issues for ChatGPT-style display
   function formatIssues(issuesText) {

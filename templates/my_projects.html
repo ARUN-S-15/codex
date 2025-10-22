@@ -12,19 +12,21 @@
     }
     
     body {
-      font-family: Arial, sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0d1117 0%, #1a1f2e 100%);
+      color: #e6edf3;
       padding: 2rem;
+      min-height: 100vh;
     }
     
     .container {
       max-width: 1400px;
       margin: 0 auto;
-      background: #161b22;
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      background: rgba(22, 27, 34, 0.95);
+      border-radius: 16px;
+      padding: 2.5rem;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(88, 166, 255, 0.1);
     }
     
     .header {
@@ -32,13 +34,17 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 2rem;
-      padding-bottom: 1rem;
-      border-bottom: 2px solid #21262d;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid rgba(88, 166, 255, 0.2);
     }
     
     h1 {
-      font-size: 2rem;
-      color: #58a6ff;
+      font-size: 2.5rem;
+      background: linear-gradient(135deg, #58a6ff 0%, #2ea043 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 700;
     }
     
     .btn-group {
@@ -88,34 +94,90 @@
       background: rgba(88, 166, 255, 0.1);
     }
     
-    .search-box {
-      margin-bottom: 1.5rem;
+    /* Filter Tabs */
+    .filter-section {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
+      margin-bottom: 2rem;
       gap: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .filter-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #0d1117;
+      padding: 0.4rem;
+      border-radius: 10px;
+      border: 1px solid #30363d;
+    }
+    
+    .filter-tab {
+      padding: 0.7rem 1.5rem;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    
+    .filter-tab:hover {
+      color: #c9d1d9;
+      background: rgba(88, 166, 255, 0.1);
+    }
+    
+    .filter-tab.active {
+      background: linear-gradient(135deg, #58a6ff 0%, #2ea043 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+    }
+    
+    .filter-tab .count {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.2rem 0.5rem;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      font-size: 0.8rem;
+    }
+    
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
     }
     
     .search-box label {
       font-weight: 600;
       color: #8b949e;
+      font-size: 0.9rem;
     }
     
     .search-box input {
-      padding: 0.6rem 1rem;
+      padding: 0.7rem 1.2rem;
       background: #0d1117;
       border: 1px solid #30363d;
-      border-radius: 6px;
-      color: #c9d1d9;
+      border-radius: 8px;
+      color: #e6edf3;
       font-size: 0.95rem;
-      width: 300px;
+      width: 280px;
       transition: all 0.3s ease;
     }
     
     .search-box input:focus {
       outline: none;
       border-color: #58a6ff;
-      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+      background: #161b22;
+    }
+    
+    .search-box input::placeholder {
+      color: #6e7681;
     }
     
     table {
@@ -213,43 +275,78 @@
     
     .action-btns {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.6rem;
+      flex-wrap: wrap;
     }
     
-    .icon-btn {
-      background: transparent;
-      border: none;
-      color: #8b949e;
+    .action-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      font-size: 0.85rem;
       cursor: pointer;
-      padding: 0.4rem;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      font-size: 1.1rem;
+      transition: all 0.3s ease;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #0d1117;
+      color: #c9d1d9;
     }
     
-    .icon-btn:hover {
-      background: #21262d;
-      transform: scale(1.1);
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     
-    .icon-btn.copy:hover {
+    .action-btn.copy {
+      border-color: #f0b429;
       color: #f0b429;
     }
     
-    .icon-btn.edit:hover {
+    .action-btn.copy:hover {
+      background: rgba(240, 180, 41, 0.1);
+      box-shadow: 0 4px 12px rgba(240, 180, 41, 0.3);
+    }
+    
+    .action-btn.edit {
+      border-color: #58a6ff;
       color: #58a6ff;
     }
     
-    .icon-btn.share:hover {
+    .action-btn.edit:hover {
+      background: rgba(88, 166, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+    }
+    
+    .action-btn.share {
+      border-color: #2ea043;
       color: #2ea043;
     }
     
-    .icon-btn.delete:hover {
+    .action-btn.share:hover {
+      background: rgba(46, 160, 67, 0.1);
+      box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
+    }
+    
+    .action-btn.download {
+      border-color: #a371f7;
+      color: #a371f7;
+    }
+    
+    .action-btn.download:hover {
+      background: rgba(163, 113, 247, 0.1);
+      box-shadow: 0 4px 12px rgba(163, 113, 247, 0.3);
+    }
+    
+    .action-btn.delete {
+      border-color: #f85149;
       color: #f85149;
     }
     
-    .icon-btn.download:hover {
-      color: #a371f7;
+    .action-btn.delete:hover {
+      background: rgba(248, 81, 73, 0.1);
+      box-shadow: 0 4px 12px rgba(248, 81, 73, 0.3);
     }
     
     .empty-state {
@@ -279,9 +376,23 @@
       </div>
     </div>
     
-    <div class="search-box">
-      <label for="searchInput">Search:</label>
-      <input type="text" id="searchInput" placeholder="Search projects..." onkeyup="filterProjects()">
+    <div class="filter-section">
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="filterByType('all')">
+          📚 All <span class="count" id="countAll">0</span>
+        </button>
+        <button class="filter-tab" data-filter="saved" onclick="filterByType('saved')">
+          💾 Saved <span class="count" id="countSaved">0</span>
+        </button>
+        <button class="filter-tab" data-filter="shared" onclick="filterByType('shared')">
+          🔗 Shared <span class="count" id="countShared">0</span>
+        </button>
+      </div>
+      
+      <div class="search-box">
+        <label for="searchInput">🔍</label>
+        <input type="text" id="searchInput" placeholder="Search by name..." onkeyup="filterProjects()">
+      </div>
     </div>
     
     <div id="projectsContainer">
@@ -331,11 +442,21 @@
             <td>{{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at.strftime else project.created_at }}</td>
             <td>
               <div class="action-btns">
-                <button class="icon-btn copy" onclick="copyProject({{ project.id }})" title="Copy code">📋</button>
-                <button class="icon-btn edit" onclick="openProject({{ project.id }})" title="Open in editor">✏️</button>
-                <button class="icon-btn share" onclick="shareProject({{ project.id }})" title="Share project">🔗</button>
-                <button class="icon-btn download" onclick="downloadProject({{ project.id }})" title="Download file">�</button>
-                <button class="icon-btn delete" onclick="deleteProject({{ project.id }})" title="Delete project">�️</button>
+                <button class="action-btn copy" onclick="copyProject({{ project.id }})">
+                  📋 Copy
+                </button>
+                <button class="action-btn edit" onclick="openProject({{ project.id }})">
+                  ✏️ Edit
+                </button>
+                <button class="action-btn share" onclick="shareProject({{ project.id }})">
+                  🔗 Share
+                </button>
+                <button class="action-btn download" onclick="downloadProject({{ project.id }})">
+                  💾 Download
+                </button>
+                <button class="action-btn delete" onclick="deleteProject({{ project.id }})">
+                  🗑️ Delete
+                </button>
               </div>
             </td>
           </tr>
@@ -355,6 +476,76 @@
   </div>
   
   <script>
+    let currentFilter = 'all';
+    
+    // Update counts on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      updateCounts();
+    });
+    
+    function updateCounts() {
+      const table = document.getElementById('projectsTable');
+      if (!table) return;
+      
+      const rows = table.getElementsByTagName('tr');
+      let savedCount = 0;
+      let sharedCount = 0;
+      let allCount = 0;
+      
+      for (let i = 1; i < rows.length; i++) {
+        const typeCell = rows[i].getElementsByTagName('td')[2];
+        if (typeCell) {
+          const text = typeCell.textContent.toLowerCase();
+          allCount++;
+          if (text.includes('saved')) savedCount++;
+          if (text.includes('shared')) sharedCount++;
+        }
+      }
+      
+      document.getElementById('countAll').textContent = allCount;
+      document.getElementById('countSaved').textContent = savedCount;
+      document.getElementById('countShared').textContent = sharedCount;
+    }
+    
+    function filterByType(type) {
+      currentFilter = type;
+      
+      // Update active tab
+      const tabs = document.querySelectorAll('.filter-tab');
+      tabs.forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.getAttribute('data-filter') === type) {
+          tab.classList.add('active');
+        }
+      });
+      
+      // Apply filter
+      const table = document.getElementById('projectsTable');
+      if (!table) return;
+      
+      const rows = table.getElementsByTagName('tr');
+      
+      for (let i = 1; i < rows.length; i++) {
+        const typeCell = rows[i].getElementsByTagName('td')[2];
+        if (typeCell) {
+          const text = typeCell.textContent.toLowerCase();
+          
+          if (type === 'all') {
+            rows[i].style.display = '';
+          } else if (type === 'saved' && text.includes('saved')) {
+            rows[i].style.display = '';
+          } else if (type === 'shared' && text.includes('shared')) {
+            rows[i].style.display = '';
+          } else {
+            rows[i].style.display = 'none';
+          }
+        }
+      }
+      
+      // Reapply search filter
+      filterProjects();
+    }
+    
     function filterProjects() {
       const input = document.getElementById('searchInput');
       const filter = input.value.toLowerCase();
@@ -365,11 +556,26 @@
       const rows = table.getElementsByTagName('tr');
       
       for (let i = 1; i < rows.length; i++) {
+        // Only filter visible rows (already filtered by type)
+        if (rows[i].style.display === 'none' && currentFilter !== 'all') continue;
+        
         const nameCell = rows[i].getElementsByTagName('td')[0];
         if (nameCell) {
           const textValue = nameCell.textContent || nameCell.innerText;
           if (textValue.toLowerCase().indexOf(filter) > -1) {
-            rows[i].style.display = '';
+            // Check if it passes the type filter
+            const typeCell = rows[i].getElementsByTagName('td')[2];
+            const typeText = typeCell.textContent.toLowerCase();
+            
+            if (currentFilter === 'all') {
+              rows[i].style.display = '';
+            } else if (currentFilter === 'saved' && typeText.includes('saved')) {
+              rows[i].style.display = '';
+            } else if (currentFilter === 'shared' && typeText.includes('shared')) {
+              rows[i].style.display = '';
+            } else {
+              rows[i].style.display = 'none';
+            }
           } else {
             rows[i].style.display = 'none';
           }

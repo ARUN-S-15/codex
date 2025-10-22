@@ -5,14 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CODEX — Online Compiler</title>
   
-  <!-- Prism.js for Syntax Highlighting -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+  <!-- CodeMirror Editor -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/comment/comment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/selection/active-line.min.js"></script>
   
   <style>
     .explanation-grid {
@@ -391,6 +398,44 @@
       display: flex;
       flex-direction: column;
     }
+    /* CodeMirror Editor Styles */
+    .CodeMirror {
+      height: 70vh !important;
+      min-height: 70vh;
+      font-size: 1.1rem !important;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+      background: #1d1d1d !important;
+      color: #ececf1 !important;
+      border-radius: 8px;
+    }
+    
+    .CodeMirror-gutters {
+      background: #2a2b32 !important;
+      border-right: 1px solid #3a3b42 !important;
+    }
+    
+    .CodeMirror-linenumber {
+      color: #9ca3af !important;
+      padding: 0 0.8rem !important;
+    }
+    
+    .CodeMirror-cursor {
+      border-left: 2px solid #10a37f !important;
+    }
+    
+    .CodeMirror-selected {
+      background: rgba(16, 163, 127, 0.3) !important;
+    }
+    
+    .CodeMirror-line {
+      padding: 0 0.5rem !important;
+      line-height: 1.8 !important;
+    }
+    
+    .CodeMirror-lines {
+      padding: 8px 0 !important;
+    }
+    
     select {
       background: #2a2b32;
       color: #ececf1;
@@ -398,137 +443,47 @@
       border-radius: 50px;
       padding: 0.7rem 1.5rem;
       font-size: 1rem;
+      cursor: pointer;
     }
-    textarea {
-      width: 100%;
-      flex: 1;
-      padding: 1rem;
-      margin: 0;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 1.3rem;
-      background: transparent;
-      color: transparent;
-      border: none;
-      border-radius: 0 5px 5px 0;
-      resize: none;
-      min-height: 70vh;
-      line-height: 1.95rem;
-      outline: none;
-      tab-size: 4;
-      caret-color: #ececf1;
-      -webkit-text-fill-color: transparent;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-      letter-spacing: 0;
-      word-spacing: 0;
-      box-sizing: border-box;
-    }
-    .line-numbers {
-      background: #2a2b32;
-      color: #9ca3af;
-      padding: 1rem 0.8rem;
-      margin: 0;
-      text-align: right;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 1.3rem;
-      border-radius: 5px 0 0 5px;
-      user-select: none;
-      white-space: pre;
-      line-height: 1.95rem;
-      overflow: hidden;
-      min-width: 50px;
-      box-sizing: border-box;
-    }
+    
     .copy-btn-overlay {
       position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: #2a2b32;
-      border: 1px solid #565869;
-      color: #ececf1;
-      padding: 0.5rem 1rem;
+      top: 0.6rem;
+      right: 0.6rem;
+      background: rgba(42, 43, 50, 0.95);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      color: #c9d1d9;
+      padding: 0.4rem 0.9rem;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 0.9rem;
-      z-index: 10;
+      font-size: 0.85rem;
+      font-weight: 500;
+      z-index: 1000;
       transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      backdrop-filter: blur(10px);
     }
+    
     .copy-btn-overlay:hover {
-      background: #10a37f;
-      border-color: #10a37f;
-      color: white;
+      background: rgba(88, 166, 255, 0.15);
+      border-color: #58a6ff;
+      color: #58a6ff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.2);
     }
+    
+    .copy-btn-overlay:active {
+      transform: translateY(0);
+    }
+    
     .editor-container {
-      display: flex;
+      position: relative;
       width: 100%;
-      height: 100%;
-      position: relative;
-      min-height: 70vh;
-      border-radius: 5px;
+      border-radius: 8px;
       overflow: hidden;
-    }
-    
-    /* Syntax highlighting overlay */
-    .editor-wrapper {
-      position: relative;
-      flex: 1;
-      display: flex;
-      background: #1d1d1d;
-    }
-    
-    .syntax-highlight {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      margin: 0;
-      padding: 1rem;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 1.3rem;
-      line-height: 1.95rem;
-      pointer-events: none;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow: hidden;
-      background: transparent;
-      border: none;
-      tab-size: 4;
-      z-index: 0;
-      letter-spacing: 0;
-      word-spacing: 0;
-      box-sizing: border-box;
-      color: #ececf1;
-    }
-    
-    .syntax-highlight code {
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-      font-size: 1.3rem !important;
-      line-height: 1.95rem !important;
-      background: transparent !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      letter-spacing: 0 !important;
-      word-spacing: 0 !important;
-      box-sizing: border-box !important;
-      color: #ececf1 !important;
-    }
-    
-    #codeEditor {
-      position: relative;
-      background: transparent;
-      color: transparent;
-      caret-color: #ececf1;
-      z-index: 1;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    #codeEditor::selection {
-      background: rgba(16, 163, 127, 0.3);
-    }
-    
-    #codeEditor::-moz-selection {
-      background: rgba(16, 163, 127, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     .btn {
       padding: 0.75rem 1.5rem;
@@ -995,11 +950,7 @@
       <div class="editor-container">
         <button id="saveBtn" class="copy-btn-overlay" style="right: 8rem;">💾 Save</button>
         <button id="copyCodeBtn" class="copy-btn-overlay">📋 Copy</button>
-        <div class="line-numbers" id="lineNumbers">1</div>
-        <div class="editor-wrapper">
-          <pre class="syntax-highlight" id="syntaxHighlight"><code id="highlightedCode" class="language-python"></code></pre>
-          <textarea id="codeEditor" placeholder="Write your code here..." spellcheck="false"></textarea>
-        </div>
+        <textarea id="codeEditor"></textarea>
       </div>
       
       <!-- Input box removed - interactive input will be handled in output box like onlineGDB -->
