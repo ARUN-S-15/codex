@@ -627,37 +627,36 @@
       pointer-events: none;
     }
     
-    /* Output Section - Bottom Sheet Style */
+    /* Output Section - Bottom Sheet Style (Semi-transparent, stays visible) */
     #resultSection {
       position: fixed;
       bottom: 0;
       left: 280px;
       right: 0;
-      background: linear-gradient(135deg, #1a1a1a 0%, #1f1f1f 100%);
+      background: rgba(26, 26, 26, 0.85); /* Semi-transparent background */
+      backdrop-filter: blur(10px); /* Blur effect for transparency */
+      -webkit-backdrop-filter: blur(10px);
       border-radius: 20px 20px 0 0;
       overflow: hidden;
       box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.8);
       z-index: 999;
       max-height: 70vh;
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       transform: translateY(100%);
-      opacity: 0;
     }
     
     #resultSection.show {
       transform: translateY(0);
-      opacity: 1;
     }
     
     #resultSection.hidden {
       transform: translateY(100%);
-      opacity: 0;
       pointer-events: none;
     }
     
-    /* Output Header */
+    /* Output Header (Semi-transparent) */
     .output-header {
-      background: linear-gradient(135deg, #2a2b32 0%, #1f2027 100%);
+      background: rgba(42, 43, 50, 0.9); /* Semi-transparent header */
       padding: 1.5rem 2rem;
       display: flex;
       align-items: center;
