@@ -398,6 +398,13 @@
       display: flex;
       flex-direction: column;
     }
+    
+    /* Override section styles for explanation */
+    #explanationSection.section {
+      background: transparent;
+      padding: 0;
+      display: block;
+    }
     /* CodeMirror Editor Styles */
     .CodeMirror {
       height: 70vh !important;
@@ -598,6 +605,15 @@
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      margin-top: 2rem;
+      position: relative;
+      z-index: 10;
+      border: 3px solid #10a37f; /* Visible border for debugging */
+      min-height: 300px; /* Ensure it has height */
+    }
+    
+    #explanationSection.hidden {
+      display: none !important;
     }
     
     .explain-header {

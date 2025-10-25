@@ -857,8 +857,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || languageSelect.value;
       const languageValue = (languageText || "").toLowerCase();
 
+      // Show the section first
+      console.log("Removing hidden class from explanationSection");
       explanationSection.classList.remove("hidden");
-      explanationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      console.log("explanationSection display:", window.getComputedStyle(explanationSection).display);
+      
+      // Scroll to it
+      setTimeout(() => {
+        explanationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
 
       if (!code) {
         explanationBox.innerHTML = `
