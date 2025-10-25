@@ -4,9 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CODEX - Practice</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- CodeMirror Editor with Addons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/comment/comment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/selection/active-line.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       font-family: 'Poppins', sans-serif;
       background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
@@ -14,6 +31,7 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
+      overflow: hidden;
     }
 
     /* NAVBAR */
@@ -24,6 +42,7 @@
       padding: 1rem 2rem;
       background: rgba(32, 33, 35, 0.95);
       border-bottom: 2px solid #10a37f;
+      flex-shrink: 0;
     }
 
     nav .logo {
@@ -38,7 +57,7 @@
     nav ul {
       list-style: none;
       display: flex;
-      gap: 1.2rem;
+      gap: 1.5rem;
     }
 
     nav ul li a {
@@ -50,34 +69,52 @@
       transition: all 0.3s ease;
     }
 
-    nav ul li a:hover, nav ul li a.active {
+    nav ul li a:hover {
       background: rgba(16, 163, 127, 0.2);
       color: #10a37f;
     }
 
-    /* MAIN LAYOUT */
-    .main {
+    /* MAIN LAYOUT - Split View */
+    .practice-container {
       display: flex;
       flex: 1;
-      height: calc(100vh - 70px);
+      overflow: hidden;
+      height: calc(100vh - 66px);
     }
 
-    /* Problem Section */
-    .problem {
-      flex: 0.45;
-      background: linear-gradient(135deg, rgba(32, 33, 35, 0.9) 0%, rgba(26, 26, 46, 0.9) 100%);
-      padding: 1.5rem;
+    /* LEFT - Problem Description */
+    .problem-panel {
+      width: 40%;
+      background: rgba(32, 33, 35, 0.9);
       border-right: 2px solid #10a37f;
       overflow-y: auto;
+      padding: 2rem;
     }
 
-    .problem h2 {
-      margin-top: 0;
-      background: linear-gradient(135deg, #10a37f 0%, #6ad7ff 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      font-size: 1.8rem;
+    .problem-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .problem-panel::-webkit-scrollbar-track {
+      background: rgba(32, 33, 35, 0.5);
+    }
+
+    .problem-panel::-webkit-scrollbar-thumb {
+      background: #10a37f;
+      border-radius: 4px;
+    }
+
+    .problem-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .problem-title h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #ececf1;
     }
 
     .difficulty-badge {
@@ -86,246 +123,308 @@
       border-radius: 20px;
       font-size: 0.85rem;
       font-weight: 600;
-      margin: 0.5rem 0 1rem 0;
+      text-transform: uppercase;
     }
 
-    .example, .constraints {
-      margin-top: 1rem;
-      background: rgba(32, 33, 35, 0.7);
-      padding: 1.2rem;
-      border-radius: 12px;
-      border: 2px solid rgba(16, 163, 127, 0.3);
+    .difficulty-badge.easy {
+      background: linear-gradient(135deg, #10a37f 0%, #0d8b6d 100%);
+      color: #fff;
     }
 
-    .example h3, .constraints h3 {
+    .difficulty-badge.medium {
+      background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+      color: #000;
+    }
+
+    .difficulty-badge.hard {
+      background: linear-gradient(135deg, #ff5459 0%, #ff1744 100%);
+      color: #fff;
+    }
+
+    .problem-description {
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #d0d0d0;
+      margin-bottom: 2rem;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section h4 {
+      font-size: 1.2rem;
       color: #6ad7ff;
-      margin-bottom: 0.8rem;
+      margin-bottom: 0.75rem;
     }
 
-    /* Editor Section */
-    .editor {
-      flex: 0.55;
+    .section pre {
+      background: rgba(16, 163, 127, 0.1);
+      border: 1px solid #10a37f;
+      border-radius: 10px;
+      padding: 1rem;
+      font-family: 'Consolas', monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #ececf1;
+      white-space: pre-wrap;
+    }
+
+    .constraints ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .constraints li {
+      padding: 0.5rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+      color: #d0d0d0;
+    }
+
+    .constraints li:before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: #10a37f;
+      font-weight: bold;
+    }
+
+    /* RIGHT - Code Editor & Results */
+    .editor-panel {
+      width: 60%;
       display: flex;
       flex-direction: column;
-      padding: 1rem;
+      background: rgba(26, 26, 46, 0.9);
+      overflow: hidden;
     }
 
     .editor-header {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 0.5rem;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      background: rgba(32, 33, 35, 0.95);
+      border-bottom: 1px solid #10a37f;
     }
 
-    select {
+    .language-select select {
       background: #1e1e1e;
       color: #f1f1f1;
-      border: 1px solid #333;
-      padding: 0.4rem;
-      border-radius: 6px;
-    }
-
-    .editor-box {
-      position: relative;
-      flex: 1;
-      display: flex;
-      margin-bottom: 0.7rem;
-    }
-
-   .line-numbers {
-      background: #2a2b32;
-      color: #9ca3af;
-      padding: 1rem 0.5rem;
-      text-align: right;
-      font-family: monospace;
-      font-size: 1rem;
-      border-radius: 10px 0 0 10px;
-      user-select: none;
-      white-space: pre;
-      line-height: 2;
-    }
-    textarea {
-      flex: 1;
-      background: #1d1d1d;
-      color: #f1f1f1;
-      border: none;
-      border-radius: 0 8px 8px 0;
-      padding: 1rem;
-      font-family: monospace;
-      font-size: 1rem;
-      resize: none;
+      border: 1px solid #10a37f;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
       outline: none;
-      line-height: 1.6rem;
     }
 
-    .actions {
+    .editor-actions {
       display: flex;
       gap: 1rem;
-      margin-bottom: 0.7rem;
     }
 
-    button {
+    .btn {
+      padding: 0.6rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .btn-run {
       background: linear-gradient(135deg, #10a37f 0%, #0d8b6d 100%);
       color: #fff;
-      border: none;
-      padding: 0.7rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
       box-shadow: 0 4px 15px rgba(16, 163, 127, 0.3);
     }
 
-    button:hover {
+    .btn-run:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(16, 163, 127, 0.5);
     }
 
-    .console {
-      background: rgba(32, 33, 35, 0.8);
-      padding: 1.2rem;
-      border-radius: 12px;
-      border: 2px solid rgba(106, 215, 255, 0.3);
-      flex: 0.4;
-      overflow-y: auto;
-      font-family: monospace;
-      color: #6ad7ff;
+    .btn-submit {
+      background: linear-gradient(135deg, #6ad7ff 0%, #4a9eff 100%);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(106, 215, 255, 0.3);
     }
 
-    footer {
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(106, 215, 255, 0.5);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Code Editor */
+    .code-editor-wrapper {
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .CodeMirror {
+      height: 100% !important;
+      font-size: 15px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
+
+    /* Results Panel */
+    .results-panel {
+      height: 280px;
+      min-height: 280px;
+      flex-shrink: 0;
+      background: rgba(32, 33, 35, 0.95);
+      border-top: 2px solid #10a37f;
+      overflow-y: auto;
+      padding: 1.5rem;
+    }
+
+    .results-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .results-panel::-webkit-scrollbar-track {
+      background: rgba(32, 33, 35, 0.5);
+    }
+
+    .results-panel::-webkit-scrollbar-thumb {
+      background: #10a37f;
+      border-radius: 4px;
+    }
+
+    /* Test Result Cards */
+    .test-result {
+      background: rgba(26, 26, 46, 0.8);
+      border-left: 4px solid;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .test-result.passed {
+      border-left-color: #10a37f;
+      background: rgba(16, 163, 127, 0.1);
+    }
+
+    .test-result.failed {
+      border-left-color: #ff5459;
+      background: rgba(255, 84, 89, 0.1);
+    }
+
+    /* Success Banner */
+    .success-banner {
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.3) 0%, rgba(106, 215, 255, 0.3) 100%);
+      border: 2px solid #10a37f;
+      border-radius: 12px;
+      padding: 2rem;
       text-align: center;
-      padding: 0.7rem;
-      border-top: 1px solid #333;
-      font-size: 0.9rem;
-      color: #aaa;
+      margin-bottom: 1.5rem;
+      animation: slideIn 0.5s ease;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #10a37f;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .practice-container {
+        flex-direction: column;
+      }
+      
+      .problem-panel {
+        width: 100%;
+        height: 40%;
+        border-right: none;
+        border-bottom: 2px solid #10a37f;
+      }
+      
+      .editor-panel {
+        width: 100%;
+        height: 60%;
+      }
     }
   </style>
 </head>
 <body>
   <!-- NAVBAR -->
   <nav>
-    <div class="logo">⚡ CODEX ⚡</div>
+    <div class="logo">⚡ CODEX</div>
     <ul>
-      <li><a href="{{ url_for('main') }}">History</a></li>
+      <li><a href="{{ url_for('problem') }}">Problems</a></li>
       <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
-      <li><a href="#">About</a></li>
-      <li><a href="#">Contact</a></li>
+      <li><a href="{{ url_for('main') }}">History</a></li>
       <li><a href="{{ url_for('logout') }}">Logout</a></li>
     </ul>
   </nav>
 
-  <!-- MAIN -->
-  <div class="main">
-    <!-- Problem -->
-    <div class="problem">
-      <h2>1. Reverse a String</h2>
-      <p>Write a function that reverses a given string.</p>
-
-      <div class="example">
-        <h3>Example</h3>
-        <pre>Input: "hello"
-Output: "olleh"</pre>
-      </div>
-
-      <div class="constraints">
-        <h3>Constraints</h3>
-        <ul>
-          <li>1 ≤ string length ≤ 1000</li>
-          <li>String consists of printable ASCII characters.</li>
-        </ul>
+  <!-- PRACTICE CONTAINER -->
+  <div class="practice-container">
+    <!-- LEFT - Problem Description -->
+    <div class="problem-panel">
+      <div id="problemContent">
+        <!-- Problem content will be dynamically loaded here by practice.js -->
       </div>
     </div>
 
-    <!-- Editor -->
-    <div class="editor">
+    <!-- RIGHT - Code Editor & Results -->
+    <div class="editor-panel">
       <div class="editor-header">
-        <label for="language">Language: </label>
-        <select id="language">
-          <option>C</option>
-          <option>C++</option>
-          <option>Python</option>
-          <option>Java</option>
-        </select>
+        <div class="language-select">
+          <select id="languageSelect">
+            <option value="Python">🐍 Python</option>
+            <option value="C">🔧 C</option>
+            <option value="C++">⚙️ C++</option>
+            <option value="Java">☕ Java</option>
+          </select>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-run" id="runBtn">▶ Run Code</button>
+          <button class="btn btn-submit" id="submitBtn">✅ Submit</button>
+        </div>
       </div>
 
-      <div class="editor-box">
-        <div class="line-numbers" id="lineNumbers">1</div>
-        <textarea id="codeInput" placeholder="Write your solution here..."></textarea>
+      <div class="code-editor-wrapper">
+        <textarea id="codeEditor" style="display:none;"></textarea>
       </div>
 
-      <div class="actions">
-        <button id="runBtn">▶ Run</button>
-        <button id="submitBtn">✅ Submit</button>
+      <div class="results-panel">
+        <div style="font-size: 1.1rem; font-weight: 600; color: #6ad7ff; margin-bottom: 1rem; border-bottom: 1px solid #10a37f; padding-bottom: 0.5rem;">
+          📊 Test Results
+        </div>
+        <div id="consoleOutput" style="color: #a0a0a0; text-align: center; padding: 2rem;">
+          Click "Run Code" to test with sample cases or "Submit" to validate your solution!
+        </div>
       </div>
-
-      <div class="console" id="consoleOutput">Console output will appear here...</div>
     </div>
   </div>
 
-  <footer>
-    <p>© 2025 CODEX. All rights reserved.</p>
-  </footer>
-
-  <script>
-    const problems = {
-      1: { title: "Two Sum", desc: "Find two numbers in an array that add up to a target value.", difficulty: "easy", example: 'Input: [2, 7, 11, 15], target = 9\nOutput: [0, 1]', constraints: ['Array length ≥ 2', 'Only one valid answer exists'] },
-      2: { title: "Reverse String", desc: "Reverse a given string using various methods.", difficulty: "easy", example: 'Input: "hello"\nOutput: "olleh"', constraints: ['1 ≤ string length ≤ 1000', 'Printable ASCII characters only'] },
-      3: { title: "Fibonacci Sequence", desc: "Generate Fibonacci sequence up to n terms.", difficulty: "easy", example: 'Input: n = 5\nOutput: [0, 1, 1, 2, 3]', constraints: ['1 ≤ n ≤ 50'] },
-      4: { title: "Palindrome Check", desc: "Check if a string reads the same backward as forward.", difficulty: "easy", example: 'Input: "racecar"\nOutput: true', constraints: ['Case insensitive', 'Ignore spaces and punctuation'] },
-      5: { title: "Binary Search", desc: "Implement binary search algorithm on sorted array.", difficulty: "medium", example: 'Input: [1, 3, 5, 7, 9], target = 5\nOutput: 2', constraints: ['Array is sorted', 'Return -1 if not found'] },
-      6: { title: "Merge Sorted Arrays", desc: "Merge two sorted arrays into one sorted array.", difficulty: "medium", example: 'Input: [1, 3, 5], [2, 4, 6]\nOutput: [1, 2, 3, 4, 5, 6]', constraints: ['Both arrays are sorted', 'Handle empty arrays'] },
-      7: { title: "Valid Parentheses", desc: "Check if string has valid matching parentheses.", difficulty: "medium", example: 'Input: "({[]})"\nOutput: true', constraints: ['Only (), {}, [] characters', 'Must close in correct order'] },
-      8: { title: "Longest Substring", desc: "Find longest substring without repeating characters.", difficulty: "medium", example: 'Input: "abcabcbb"\nOutput: 3 ("abc")', constraints: ['String length ≤ 10^5', 'ASCII characters'] },
-      9: { title: "Matrix Rotation", desc: "Rotate a matrix 90 degrees clockwise.", difficulty: "hard", example: 'Input: [[1,2],[3,4]]\nOutput: [[3,1],[4,2]]', constraints: ['Square matrix', 'Modify in-place if possible'] },
-      10: { title: "Graph Traversal", desc: "Implement BFS and DFS on a graph structure.", difficulty: "hard", example: 'Input: Graph with 5 nodes\nOutput: BFS and DFS traversal order', constraints: ['Handle disconnected components', 'No duplicate visits'] },
-      11: { title: "Dynamic Programming", desc: "Solve classic DP problems (Knapsack, LCS).", difficulty: "hard", example: 'Input: Weights [1,2,3], Values [10,15,40], Capacity 6\nOutput: 55', constraints: ['Optimize time and space', 'Handle edge cases'] },
-      12: { title: "Backtracking", desc: "Solve N-Queens problem using backtracking.", difficulty: "hard", example: 'Input: n = 4\nOutput: 2 solutions', constraints: ['No two queens attack each other', 'Return all solutions'] }
-    };
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const problemId = parseInt(urlParams.get('id')) || 1;
-    const currentProblem = problems[problemId];
-
-    document.querySelector('.problem h2').innerHTML = `${problemId}. ${currentProblem.title} ${getEmojiForDifficulty(currentProblem.difficulty)}`;
-    
-    const difficultyBadge = document.createElement('div');
-    difficultyBadge.className = `difficulty-badge ${currentProblem.difficulty}`;
-    difficultyBadge.textContent = `🔥 ${currentProblem.difficulty.toUpperCase()}`;
-    difficultyBadge.style.background = getDifficultyColor(currentProblem.difficulty);
-    document.querySelector('.problem h2').after(difficultyBadge);
-
-    document.querySelector('.problem > p').textContent = currentProblem.desc;
-    document.querySelector('.example pre').textContent = currentProblem.example;
-    document.querySelector('.constraints ul').innerHTML = currentProblem.constraints.map(c => `<li>${c}</li>`).join('');
-
-    function getEmojiForDifficulty(diff) {
-      return { easy: '🟢', medium: '🟡', hard: '🔴' }[diff];
-    }
-
-    function getDifficultyColor(diff) {
-      const colors = {
-        easy: 'linear-gradient(135deg, #10a37f 0%, #0d8b6d 100%)',
-        medium: 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)',
-        hard: 'linear-gradient(135deg, #ff5459 0%, #ff1744 100%)'
-      };
-      return colors[diff];
-    }
-
-    const textarea = document.getElementById("codeInput");
-    const lineNumbers = document.getElementById("lineNumbers");
-    const consoleOutput = document.getElementById("consoleOutput");
-
-    textarea.addEventListener("input", () => {
-      const lines = textarea.value.split("\n").length;
-      lineNumbers.textContent = Array.from({length: lines}, (_, i) => i + 1).join("\n");
-    });
-
-    document.getElementById("runBtn").addEventListener("click", () => {
-      consoleOutput.innerHTML = "⚡ <span style='color: #10a37f;'>Running your code...</span>\n<span style='color: #6ad7ff;'>Output:</span> Test passed!";
-    });
-
-    document.getElementById("submitBtn").addEventListener("click", () => {
-      consoleOutput.innerHTML = "✅ <span style='color: #10a37f;'>Submitted successfully!</span>\n🎉 All test cases passed.";
-    });
-  </script>
+  <script src="{{ url_for('static', filename='js/practice.js') }}"></script>
 </body>
 </html>

@@ -403,6 +403,48 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const match of matches) {
           inputPrompts.push(match[1]);
         }
+      } else if (language_id === 50 || language_id === 54) { // C or C++
+        // Extract prompts from printf before scanf/cin
+        // Match printf("prompt"); followed by scanf/cin
+        const lines = code.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          // Check if this line has scanf or cin (input operation)
+          if (line.includes('scanf') || line.includes('cin >>')) {
+            // Look backwards for the most recent printf
+            for (let j = i - 1; j >= 0; j--) {
+              const prevLine = lines[j].trim();
+              const printfMatch = prevLine.match(/printf\s*\(\s*"([^"]+)"\s*\)/);
+              if (printfMatch) {
+                inputPrompts.push(printfMatch[1]);
+                break;
+              }
+              // Stop if we hit another input statement or function boundary
+              if (prevLine.includes('scanf') || prevLine.includes('cin >>') || prevLine.includes('{')) {
+                break;
+              }
+            }
+          }
+        }
+      } else if (language_id === 62) { // Java
+        // Match Scanner.nextLine() with System.out.print before it
+        const lines = code.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.includes('.next')) {
+            for (let j = i - 1; j >= 0; j--) {
+              const prevLine = lines[j].trim();
+              const printMatch = prevLine.match(/System\.out\.print(?:ln)?\s*\(\s*"([^"]+)"\s*\)/);
+              if (printMatch) {
+                inputPrompts.push(printMatch[1]);
+                break;
+              }
+              if (prevLine.includes('.next') || prevLine.includes('{')) {
+                break;
+              }
+            }
+          }
+        }
       }
       
       // Default prompts if none extracted
@@ -537,11 +579,11 @@ document.addEventListener("DOMContentLoaded", () => {
         let output = data.output || "⚠️ No output returned.";
         
         // Filter out input prompts from the output (they're already shown interactively)
-        if (language_id === 71 && inputPrompts.length > 0) {
-          // Remove all the prompts that we already displayed
+        if (inputPrompts.length > 0) {
+          // Remove all the prompts that we already displayed for ANY language
           inputPrompts.forEach(prompt => {
-            // Remove the prompt text from output
-            output = output.replace(prompt, '');
+            // Remove the prompt text from output (handle with and without trailing space)
+            output = output.replace(new RegExp(prompt + '\\s*', 'g'), '');
           });
           
           // Clean up any extra whitespace or newlines at the start

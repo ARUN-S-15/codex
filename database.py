@@ -50,11 +50,24 @@ def init_mysql_database():
                 username VARCHAR(255) UNIQUE NOT NULL,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                email_verified BOOLEAN DEFAULT FALSE,
+                verification_token VARCHAR(100),
+                reset_token VARCHAR(100),
+                reset_token_expiry TIMESTAMP NULL,
+                profile_picture VARCHAR(500),
+                is_admin BOOLEAN DEFAULT FALSE,
+                oauth_provider VARCHAR(50),
+                oauth_id VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP NULL,
+                INDEX idx_username (username),
+                INDEX idx_email (email),
+                INDEX idx_verification_token (verification_token),
+                INDEX idx_reset_token (reset_token)
             )
         ''')
         
-        # Create history table for tracking user activities
+        # Create code_history table for tracking all user activities
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS code_history (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -66,12 +79,53 @@ def init_mysql_database():
                 output TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                INDEX idx_user_created (user_id, created_at)
+                INDEX idx_user_created (user_id, created_at),
+                INDEX idx_activity (activity_type),
+                INDEX idx_user_activity (user_id, activity_type)
+            )
+        ''')
+        
+        # Create shared_codes table (separate from history for better organization)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS shared_codes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                share_token VARCHAR(100) UNIQUE NOT NULL,
+                views INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_share_token (share_token),
+                INDEX idx_user_shared (user_id, created_at)
+            )
+        ''')
+        
+        # Create projects table for saved user projects
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50) NOT NULL,
+                is_public BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_user_projects (user_id, created_at),
+                INDEX idx_public (is_public)
             )
         ''')
         
         conn.commit()
         print(f"✅ MySQL database '{db_name}' initialized successfully!")
+        print(f"   - users table created")
+        print(f"   - code_history table created")
+        print(f"   - shared_codes table created")
+        print(f"   - projects table created")
         cursor.close()
         conn.close()
         return True

@@ -3,11 +3,14 @@ import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for, make_response, Response, session, flash
 import sys, ast, traceback, re, requests, subprocess, tempfile
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from database import init_db, fetch_one, execute_query, add_to_history, get_user_history, get_history_by_id, delete_history_item, generate_code_title
 import google.generativeai as genai
 import json
+from email_utils import init_mail, generate_verification_token, generate_reset_token, send_verification_email, send_password_reset_email, send_welcome_email
+from oauth_config import init_oauth
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,9 +19,9 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Use gemini-2.5-flash - stable, fast, and efficient
-    gemini_model = genai.GenerativeModel('gemini-2.5-flash')
-    print("✅ Gemini AI enabled: gemini-2.5-flash")
+    # Use gemini-2.0-flash-exp - experimental model with better JSON formatting
+    gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    print("✅ Gemini AI enabled: gemini-2.0-flash-exp")
 else:
     gemini_model = None
     print("⚠️ WARNING: GEMINI_API_KEY not found in .env file. AI features will be disabled.")
@@ -32,8 +35,43 @@ app.config['DB_TYPE'] = os.getenv('DB_TYPE', 'mysql')
 app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
 app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'False') == 'True'
 
+# File upload configuration
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'profiles')
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max file size
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Ensure upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Initialize email system
+mail = init_mail(app)
+
+# Initialize OAuth
+oauth, google_oauth, github_oauth = init_oauth(app)
+
 # Initialize database on startup
 init_db()
+
+# ---------------- HELPER FUNCTIONS ----------------
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def check_user():
+    """Check if user is logged in"""
+    return session.get('username')
+
+def require_email_verification(user_id):
+    """Check if user's email is verified"""
+    user = fetch_one('SELECT email_verified FROM users WHERE id = ?', (user_id,))
+    return user and user[0]
+
+def is_admin():
+    """Check if current user is admin"""
+    if not session.get('user_id'):
+        return False
+    user = fetch_one('SELECT is_admin FROM users WHERE id = ?', (session['user_id'],))
+    return user and user[0]
 
 # ---------------- AUTHENTICATION ----------------
 @app.route("/", methods=["GET", "POST"])
@@ -49,6 +87,13 @@ def login():
             # Login successful
             session['user_id'] = user[0]
             session['username'] = user[1]
+            
+            # Update last login (optional tracking)
+            try:
+                execute_query('UPDATE users SET last_login = NOW() WHERE id = ?', (user[0],))
+            except:
+                pass  # Ignore if column doesn't exist in older databases
+            
             return redirect(url_for("main"))
         else:
             return render_template("login.html", error="Invalid username or password!")
@@ -65,29 +110,32 @@ def register():
         
         # Validation
         if not username or not email or not password:
-            return render_template("register.html", error="All fields are required!")
+            return render_template("login.html", register_error="All fields are required!")
         
         if password != confirm_password:
-            return render_template("register.html", error="Passwords do not match!")
+            return render_template("login.html", register_error="Passwords do not match!")
         
         if len(password) < 6:
-            return render_template("register.html", error="Password must be at least 6 characters!")
+            return render_template("login.html", register_error="Password must be at least 6 characters!")
         
         # Check if user already exists
         existing_user = fetch_one('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
         
         if existing_user:
-            return render_template("register.html", error="Username or email already exists!")
+            return render_template("login.html", register_error="Username or email already exists!")
         
         # Create new user
         hashed_password = generate_password_hash(password)
+        
         try:
-            execute_query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                         (username, email, hashed_password))
-            flash("Registration successful! Please login.", "success")
-            return redirect(url_for("login"))
+            execute_query('''
+                INSERT INTO users (username, email, password, email_verified)
+                VALUES (?, ?, ?, ?)
+            ''', (username, email, hashed_password, True))
+            
+            return render_template("login.html", success="Registration successful! You can now login.")
         except Exception as e:
-            return render_template("register.html", error=f"Registration failed: {str(e)}")
+            return render_template("login.html", register_error=f"Registration failed: {str(e)}")
     
     return render_template("register.html")
 
@@ -95,6 +143,445 @@ def register():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+# ---------------- EMAIL VERIFICATION ----------------
+@app.route("/verify-email/<token>")
+def verify_email(token):
+    """Verify user email with token"""
+    try:
+        # Find user by verification token
+        user = fetch_one('SELECT id, username, email FROM users WHERE verification_token = ?', (token,))
+        
+        if not user:
+            return render_template("message.html", 
+                                 title="Verification Failed",
+                                 message="Invalid or expired verification link.",
+                                 type="error")
+        
+        # Update user as verified
+        execute_query('UPDATE users SET email_verified = TRUE, verification_token = NULL WHERE id = ?', (user[0],))
+        
+        # Send welcome email
+        send_welcome_email(mail, user[2], user[1])
+        
+        return render_template("message.html",
+                             title="Email Verified!",
+                             message=f"Success! Your email has been verified. You can now <a href='{url_for('login')}'>login</a> to your account.",
+                             type="success")
+    except Exception as e:
+        print(f"Error verifying email: {e}")
+        return render_template("message.html",
+                             title="Error",
+                             message="An error occurred during verification. Please try again.",
+                             type="error")
+
+# ---------------- PASSWORD RESET ----------------
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    """Request password reset"""
+    if request.method == "POST":
+        email = request.form.get("email")
+        
+        # Find user by email
+        user = fetch_one('SELECT id, username, email FROM users WHERE email = ?', (email,))
+        
+        if user:
+            # Generate reset token
+            reset_token = generate_reset_token()
+            expiry = datetime.now() + timedelta(hours=1)
+            
+            # Save token to database
+            execute_query('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?',
+                        (reset_token, expiry, user[0]))
+            
+            # Send reset email
+            send_password_reset_email(mail, user[2], user[1], reset_token, request.host)
+        
+        # Always show success message (security: don't reveal if email exists)
+        return render_template("forgot_password.html", 
+                             success="If that email exists, you'll receive a password reset link shortly.")
+    
+    return render_template("forgot_password.html")
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    """Reset password with token"""
+    # Verify token
+    user = fetch_one('SELECT id, username, reset_token_expiry FROM users WHERE reset_token = ?', (token,))
+    
+    if not user:
+        return render_template("message.html",
+                             title="Invalid Link",
+                             message="This password reset link is invalid.",
+                             type="error")
+    
+    # Check if token expired
+    if user[2] and datetime.now() > user[2]:
+        return render_template("message.html",
+                             title="Link Expired",
+                             message="This password reset link has expired. Please request a new one.",
+                             type="error")
+    
+    if request.method == "POST":
+        new_password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        
+        if not new_password or len(new_password) < 6:
+            return render_template("reset_password.html", token=token,
+                                 error="Password must be at least 6 characters!")
+        
+        if new_password != confirm_password:
+            return render_template("reset_password.html", token=token,
+                                 error="Passwords do not match!")
+        
+        # Update password
+        hashed_password = generate_password_hash(new_password)
+        execute_query('UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?',
+                    (hashed_password, user[0]))
+        
+        return render_template("message.html",
+                             title="Password Reset Successfully",
+                             message=f"Your password has been reset! You can now <a href='{url_for('login')}'>login</a> with your new password.",
+                             type="success")
+    
+    return render_template("reset_password.html", token=token)
+
+# ---------------- OAUTH LOGIN ----------------
+@app.route("/login/google")
+def google_login():
+    """Initiate Google OAuth login"""
+    if not google_oauth:
+        return render_template("message.html",
+                             title="OAuth Disabled",
+                             message="Google login is not configured.",
+                             type="error")
+    redirect_uri = url_for('google_callback', _external=True)
+    return google_oauth.authorize_redirect(redirect_uri)
+
+@app.route("/login/google/callback")
+def google_callback():
+    """Handle Google OAuth callback"""
+    if not google_oauth:
+        return redirect(url_for('login'))
+    
+    try:
+        token = google_oauth.authorize_access_token()
+        user_info = token.get('userinfo')
+        
+        if user_info:
+            email = user_info.get('email')
+            name = user_info.get('name', email.split('@')[0])
+            google_id = user_info.get('sub')
+            picture = user_info.get('picture')
+            
+            # Check if user exists
+            user = fetch_one('SELECT id, username FROM users WHERE email = ? OR oauth_id = ?', (email, google_id))
+            
+            if user:
+                # Existing user - login
+                session['user_id'] = user[0]
+                session['username'] = user[1]
+                execute_query('UPDATE users SET last_login = NOW() WHERE id = ?', (user[0],))
+            else:
+                # New user - create account
+                username = name.replace(' ', '_').lower()
+                # Ensure unique username
+                counter = 1
+                original_username = username
+                while fetch_one('SELECT id FROM users WHERE username = ?', (username,)):
+                    username = f"{original_username}{counter}"
+                    counter += 1
+                
+                user_id = execute_query('''
+                    INSERT INTO users (username, email, password, email_verified, oauth_provider, oauth_id, profile_picture)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (username, email, '', True, 'google', google_id, picture))
+                
+                session['user_id'] = user_id
+                session['username'] = username
+            
+            return redirect(url_for('main'))
+    except Exception as e:
+        print(f"Google OAuth error: {e}")
+        return redirect(url_for('login'))
+
+@app.route("/login/github")
+def github_login():
+    """Initiate GitHub OAuth login"""
+    if not github_oauth:
+        return render_template("message.html",
+                             title="OAuth Disabled",
+                             message="GitHub login is not configured.",
+                             type="error")
+    redirect_uri = url_for('github_callback', _external=True)
+    return github_oauth.authorize_redirect(redirect_uri)
+
+@app.route("/login/github/callback")
+def github_callback():
+    """Handle GitHub OAuth callback"""
+    if not github_oauth:
+        return redirect(url_for('login'))
+    
+    try:
+        token = github_oauth.authorize_access_token()
+        resp = github_oauth.get('user', token=token)
+        user_info = resp.json()
+        
+        if user_info:
+            github_id = str(user_info.get('id'))
+            username_github = user_info.get('login')
+            name = user_info.get('name', username_github)
+            email = user_info.get('email')
+            picture = user_info.get('avatar_url')
+            
+            # Get email if not in profile
+            if not email:
+                resp = github_oauth.get('user/emails', token=token)
+                emails = resp.json()
+                for e in emails:
+                    if e.get('primary'):
+                        email = e.get('email')
+                        break
+            
+            # Check if user exists
+            user = fetch_one('SELECT id, username FROM users WHERE oauth_id = ?', (github_id,))
+            
+            if user:
+                # Existing user - login
+                session['user_id'] = user[0]
+                session['username'] = user[1]
+                execute_query('UPDATE users SET last_login = NOW() WHERE id = ?', (user[0],))
+            else:
+                # New user - create account
+                username = username_github.lower()
+                counter = 1
+                original_username = username
+                while fetch_one('SELECT id FROM users WHERE username = ?', (username,)):
+                    username = f"{original_username}{counter}"
+                    counter += 1
+                
+                user_id = execute_query('''
+                    INSERT INTO users (username, email, password, email_verified, oauth_provider, oauth_id, profile_picture)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (username, email or f"{username}@github.com", '', True, 'github', github_id, picture))
+                
+                session['user_id'] = user_id
+                session['username'] = username
+            
+            return redirect(url_for('main'))
+    except Exception as e:
+        print(f"GitHub OAuth error: {e}")
+        return redirect(url_for('login'))
+
+# ---------------- PROFILE PAGE ----------------
+@app.route("/profile")
+def profile():
+    """View user profile"""
+    if not check_user():
+        return redirect(url_for('login'))
+    
+    user = fetch_one('''
+        SELECT id, username, email, email_verified, profile_picture, oauth_provider, created_at, last_login, is_admin
+        FROM users WHERE id = ?
+    ''', (session['user_id'],))
+    
+    if not user:
+        return redirect(url_for('login'))
+    
+    # Get user statistics
+    from database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT COUNT(*) FROM code_history WHERE user_id = %s', (session['user_id'],))
+    total_activities = cursor.fetchone()[0]
+    
+    cursor.execute('SELECT COUNT(*) FROM code_history WHERE user_id = %s AND activity_type = "saved"', (session['user_id'],))
+    total_projects = cursor.fetchone()[0]
+    
+    cursor.execute('SELECT COUNT(*) FROM code_history WHERE user_id = %s AND activity_type = "shared"', (session['user_id'],))
+    total_shared = cursor.fetchone()[0]
+    
+    cursor.close()
+    conn.close()
+    
+    user_data = {
+        'id': user[0],
+        'username': user[1],
+        'email': user[2],
+        'email_verified': user[3],
+        'profile_picture': user[4],
+        'oauth_provider': user[5],
+        'created_at': user[6],
+        'last_login': user[7],
+        'is_admin': user[8],
+        'total_activities': total_activities,
+        'total_projects': total_projects,
+        'total_shared': total_shared
+    }
+    
+    return render_template("profile.html", user=user_data)
+
+@app.route("/profile/change-password", methods=["GET", "POST"])
+def change_password():
+    """Change user password"""
+    if not check_user():
+        return redirect(url_for('login'))
+    
+    # Check if user uses OAuth (no password change needed)
+    user = fetch_one('SELECT oauth_provider FROM users WHERE id = ?', (session['user_id'],))
+    if user and user[0]:
+        flash("You're using OAuth login. Password change is not available.", "info")
+        return redirect(url_for('profile'))
+    
+    if request.method == "POST":
+        current_password = request.form.get("current_password")
+        new_password = request.form.get("new_password")
+        confirm_password = request.form.get("confirm_password")
+        
+        # Verify current password
+        user = fetch_one('SELECT password FROM users WHERE id = ?', (session['user_id'],))
+        if not check_password_hash(user[0], current_password):
+            flash("Current password is incorrect!", "error")
+            return redirect(url_for('change_password'))
+        
+        if len(new_password) < 6:
+            flash("New password must be at least 6 characters!", "error")
+            return redirect(url_for('change_password'))
+        
+        if new_password != confirm_password:
+            flash("Passwords do not match!", "error")
+            return redirect(url_for('change_password'))
+        
+        # Update password
+        hashed_password = generate_password_hash(new_password)
+        execute_query('UPDATE users SET password = ? WHERE id = ?', (hashed_password, session['user_id']))
+        
+        flash("Password changed successfully!", "success")
+        return redirect(url_for('profile'))
+    
+    return render_template("change_password.html")
+
+@app.route("/profile/upload-picture", methods=["POST"])
+def upload_profile_picture():
+    """Upload profile picture"""
+    if not check_user():
+        return jsonify({"success": False, "error": "Not logged in"}), 401
+    
+    if 'profile_picture' not in request.files:
+        return jsonify({"success": False, "error": "No file uploaded"}), 400
+    
+    file = request.files['profile_picture']
+    
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No file selected"}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(f"user_{session['user_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{file.filename.rsplit('.', 1)[1].lower()}")
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        # Update database
+        picture_url = f"/static/uploads/profiles/{filename}"
+        execute_query('UPDATE users SET profile_picture = ? WHERE id = ?', (picture_url, session['user_id']))
+        
+        return jsonify({"success": True, "picture_url": picture_url})
+    
+    return jsonify({"success": False, "error": "Invalid file type"}), 400
+
+# ---------------- ADMIN DASHBOARD ----------------
+@app.route("/admin")
+def admin_dashboard():
+    """Admin dashboard"""
+    if not check_user() or not is_admin():
+        return render_template("message.html",
+                             title="Access Denied",
+                             message="You don't have permission to access this page.",
+                             type="error")
+    
+    from database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get statistics
+    cursor.execute('SELECT COUNT(*) as total FROM users')
+    total_users = cursor.fetchone()['total']
+    
+    cursor.execute('SELECT COUNT(*) as total FROM code_history')
+    total_activities = cursor.fetchone()['total']
+    
+    cursor.execute('SELECT COUNT(*) as total FROM code_history WHERE activity_type = "saved"')
+    total_projects = cursor.fetchone()['total']
+    
+    cursor.execute('SELECT COUNT(*) as total FROM code_history WHERE activity_type = "shared"')
+    total_shared = cursor.fetchone()['total']
+    
+    # Get recent users
+    cursor.execute('''
+        SELECT id, username, email, email_verified, oauth_provider, created_at, last_login
+        FROM users ORDER BY created_at DESC LIMIT 10
+    ''')
+    recent_users = cursor.fetchall()
+    
+    # Get activity breakdown
+    cursor.execute('''
+        SELECT activity_type, COUNT(*) as count
+        FROM code_history
+        GROUP BY activity_type
+    ''')
+    activity_breakdown = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    stats = {
+        'total_users': total_users,
+        'total_activities': total_activities,
+        'total_projects': total_projects,
+        'total_shared': total_shared,
+        'recent_users': recent_users,
+        'activity_breakdown': activity_breakdown
+    }
+    
+    return render_template("admin_dashboard.html", stats=stats)
+
+@app.route("/admin/users")
+def admin_users():
+    """View all users"""
+    if not check_user() or not is_admin():
+        return redirect(url_for('login'))
+    
+    from database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute('''
+        SELECT id, username, email, email_verified, oauth_provider, is_admin, created_at, last_login
+        FROM users ORDER BY created_at DESC
+    ''')
+    users = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    return render_template("admin_users.html", users=users)
+
+@app.route("/admin/toggle-admin/<int:user_id>", methods=["POST"])
+def toggle_admin(user_id):
+    """Toggle admin status for user"""
+    if not check_user() or not is_admin():
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    
+    # Don't allow toggling own admin status
+    if user_id == session['user_id']:
+        return jsonify({"success": False, "error": "Cannot modify your own admin status"}), 400
+    
+    # Toggle admin status
+    user = fetch_one('SELECT is_admin FROM users WHERE id = ?', (user_id,))
+    new_status = not user[0]
+    execute_query('UPDATE users SET is_admin = ? WHERE id = ?', (new_status, user_id))
+    
+    return jsonify({"success": True, "is_admin": new_status})
 
 def check_user():
     return session.get('username')
@@ -172,7 +659,7 @@ def is_valid_code(code):
     code_indicators = [
         # Python
         'def ', 'class ', 'import ', 'from ', 'if ', 'elif ', 'else:', 'for ', 'while ', 
-        'return ', 'try:', 'except:', 'with ', 'lambda ', 'yield ', 'async ', 'await ',
+        'return ', 'try:', 'except:', 'with ', 'lambda ', 'yield ', 'async ', 'await ', 'print(',
         # JavaScript/Java/C++
         'function ', 'var ', 'let ', 'const ', 'public ', 'private ', 'static ',
         'void ', 'int ', 'String ', 'class ', 'interface ', 'extends ', 'implements ',
@@ -950,6 +1437,7 @@ def ai_explain_code(code, language):
     Provides intelligent, context-aware explanations for any language.
     """
     if not gemini_model:
+        print("⚠️ Gemini model not available - API key may be missing")
         return None  # Fall back to rule-based explanation
     
     try:
@@ -990,34 +1478,76 @@ Focus on:
 
 Return ONLY the JSON, no markdown formatting."""
 
-        response = gemini_model.generate_content(prompt)
-        response_text = response.text.strip()
+        print(f"🤖 Calling Gemini AI for {language} explanation...")
         
-        # Clean up response
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        elif response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
+        # Set timeout using signal (Unix) or threading (Windows)
+        import time
+        from threading import Thread
+        
+        result_container = {'response': None, 'error': None}
+        
+        def call_gemini():
+            try:
+                result_container['response'] = gemini_model.generate_content(prompt)
+            except Exception as e:
+                result_container['error'] = str(e)
+        
+        start_time = time.time()
+        thread = Thread(target=call_gemini)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=30)  # 30 second timeout
+        
+        if thread.is_alive():
+            print(f"❌ Gemini API timeout after 30s - using fallback")
+            return None
+        
+        if result_container['error']:
+            print(f"❌ Gemini API error: {result_container['error']}")
+            return None
+        
+        if not result_container['response']:
+            print(f"❌ No response from Gemini API")
+            return None
+        
+        response_text = result_container['response'].text.strip()
+        elapsed = time.time() - start_time
+        print(f"✅ AI response received ({len(response_text)} chars) in {elapsed:.1f}s")
+        
+        # Clean up markdown code blocks (Gemini often wraps JSON in ```json ... ```)
+        if response_text.startswith('```'):
+            # Remove all lines that are just markdown delimiters
+            lines = response_text.split('\n')
+            clean_lines = [line for line in lines if not line.strip().startswith('```')]
+            response_text = '\n'.join(clean_lines).strip()
+            print("🧹 Removed markdown wrapper")
         
         # Parse JSON
         result = json.loads(response_text)
+        print(f"✅ JSON parsed successfully - {len(result.get('steps', []))} steps found")
         return result
         
+    except json.JSONDecodeError as e:
+        print(f"❌ AI explanation JSON parse error: {e}")
+        print(f"Response preview: {response_text[:200]}...")
+        return None
     except Exception as e:
-        print(f"AI explanation error: {e}")
+        print(f"❌ AI explanation error: {e}")
         return None  # Fall back to rule-based
 
 
 def generate_comprehensive_explanation(code, language):
     """
-    Generate intelligent, ChatGPT-style code explanation with rich, detailed content.
-    Maximum information density with minimal spacing.
+    Generate clean, colorful code explanation like ChatGPT/Claude style.
+    Simple sections with beautiful gradients and icons.
     """
+    print("\n🔍 generate_comprehensive_explanation() called")
+    print(f"   Language: {language}, Code length: {len(code)}")
+    
     # Try AI explanation first, fall back to rule-based if unavailable
     ai_result = ai_explain_code(code, language)
+    
+    print(f"   AI Result: {'✅ SUCCESS' if ai_result else '❌ NONE (falling back)'}")
     
     if ai_result:
         # Use AI-generated analysis
@@ -1042,257 +1572,185 @@ def generate_comprehensive_explanation(code, language):
         # Fall back to rule-based analysis
         code_analysis = deep_analyze_code(code, language)
     
-    # Build HTML with 3-4 BIG BOXES with RICH CONTENT
+    # Build beautiful, clean HTML sections with colorful theme
     html_parts = []
     
-    # ═══════════════════════════════════════════════════════════
-    # BOX 1: OVERVIEW & COMPLEXITY (Combined - Top Section)
-    # ═══════════════════════════════════════════════════════════
-    html_parts.append('''
-    <div class="issue-card" style="margin-bottom: 1rem; padding: 1rem 1.2rem; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%); border-left: 4px solid #3b82f6;">
-        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
-            <span class="issue-badge" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 0.4rem 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(59,130,246,0.3);">
-                🎯 CODE OVERVIEW & ANALYSIS
-            </span>
+    # Header with code preview
+    safe_code = code.replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+    html_parts.append(f'''
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem; border: 1px solid rgba(59, 130, 246, 0.3);">
+        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;">
+            📄 Your Code
         </div>
-        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.2rem;">
-            <!-- Left: Algorithm Summary -->
-            <div>
+        <pre style="margin: 0; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9rem; color: #e2e8f0; line-height: 1.5; overflow-x: auto;"><code>{safe_code}</code></pre>
+    </div>
     ''')
     
-    if code_analysis['summary']:
-        html_parts.append(f'''
-                <h3 style="margin: 0 0 0.6rem 0; color: var(--color-text); font-size: 1.05rem; font-weight: 700;">
-                    📋 What This Code Does
-                </h3>
-                <p style="margin: 0 0 0.8rem 0; color: var(--color-text); line-height: 1.6; font-size: 0.95rem; font-weight: 500;">
-                    {code_analysis['summary']}
-                </p>
-        ''')
-        
-        # Add algorithm context
-        algo_context = ""
-        if 'BFS' in code_analysis['summary'] or 'Breadth-First' in code_analysis['summary']:
-            algo_context = "Uses a <strong>queue (FIFO)</strong> data structure for level-order traversal. Explores all nodes at the current depth before moving to nodes at the next depth level. Optimal for finding shortest paths in unweighted graphs and solving minimum step problems."
-        elif 'DFS' in code_analysis['summary'] or 'Depth-First' in code_analysis['summary']:
-            algo_context = "Uses <strong>stack (LIFO)</strong> or <strong>recursion</strong> for deep exploration. Goes as deep as possible along each branch before backtracking. Perfect for path finding, cycle detection, and exploring all possible solutions."
-        elif 'Dynamic Programming' in code_analysis['summary'] or 'DP' in code_analysis['summary']:
-            algo_context = "Stores solutions to <strong>overlapping subproblems</strong> to avoid redundant computation. Uses memoization (top-down) or tabulation (bottom-up) approach. Essential for optimization problems with optimal substructure."
-        elif 'Binary Search' in code_analysis['summary']:
-            algo_context = "Divides search space in <strong>half with each iteration</strong>, achieving logarithmic time complexity. Requires data to be sorted. Each comparison eliminates half of the remaining possibilities."
-        elif 'Sorting' in code_analysis['summary']:
-            algo_context = "Arranges elements in a specific order using <strong>compare-and-swap</strong> operations. Forms the foundation for many other algorithms that require ordered data."
-        else:
-            algo_context = "This code implements a specific logic flow to solve the problem efficiently."
-        
-        html_parts.append(f'''
-                <div style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid #3b82f6; padding: 0.8rem; border-radius: 6px; margin-bottom: 1rem;">
-                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
-                        <strong style="color: #3b82f6;">🧠 Algorithm Concept:</strong><br>
-                        {algo_context}
-                    </p>
-                </div>
-        ''')
+    # High-Level Overview
+    html_parts.append(f'''
+    <div style="margin-bottom: 1.2rem;">
+        <h2 style="color: #3b82f6; font-size: 1.3rem; font-weight: 700; margin: 0 0 0.6rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="background: linear-gradient(135deg, #3b82f6, #2563eb); padding: 0.3rem 0.6rem; border-radius: 8px; color: white;">🎯</span>
+            High-Level Overview
+        </h2>
+        <p style="color: var(--color-text); font-size: 0.95rem; line-height: 1.6; margin: 0; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05)); padding: 0.9rem; border-radius: 8px; border-left: 3px solid #3b82f6;">
+            {code_analysis.get('summary', 'This code implements a specific functionality.')}
+        </p>
+    </div>
+    ''')
     
-    # Right: Complexity Analysis
+    # Detailed Explanation
     html_parts.append('''
-            </div>
-            <div>
-                <h3 style="margin: 0 0 0.6rem 0; color: var(--color-text); font-size: 1.05rem; font-weight: 700;">
-                    ⚡ Performance
-                </h3>
+    <div style="margin-bottom: 1.2rem;">
+        <h2 style="color: #10b981; font-size: 1.3rem; font-weight: 700; margin: 0 0 0.6rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="background: linear-gradient(135deg, #10b981, #059669); padding: 0.3rem 0.6rem; border-radius: 8px; color: white;">📖</span>
+            Detailed Explanation
+        </h2>
     ''')
     
-    if code_analysis['time_complexity']:
-        performance_badge = ""
-        if 'O(1)' in code_analysis['time_complexity']:
-            performance_badge = '<span style="background: #10b981; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">EXCELLENT</span>'
-        elif 'O(log n)' in code_analysis['time_complexity']:
-            performance_badge = '<span style="background: #22c55e; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">GREAT</span>'
-        elif 'O(n)' in code_analysis['time_complexity']:
-            performance_badge = '<span style="background: #3b82f6; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">GOOD</span>'
-        elif 'O(n log n)' in code_analysis['time_complexity']:
-            performance_badge = '<span style="background: #f59e0b; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">OPTIMAL</span>'
-        elif 'O(n²)' in code_analysis['time_complexity'] or 'O(n^2)' in code_analysis['time_complexity']:
-            performance_badge = '<span style="background: #ef4444; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">CONSIDER OPTIMIZATION</span>'
+    # Step-by-step breakdown
+    for i, step in enumerate(code_analysis.get('steps', []), 1):
+        step_title = step.get('title', f'Step {i}')
+        step_explanation = step.get('explanation', '')
+        step_code = step.get('code_block', '')
+        step_why = step.get('why', '')
         
         html_parts.append(f'''
-                <div style="background: rgba(245, 158, 11, 0.08); padding: 0.8rem; border-radius: 6px; margin-bottom: 0.7rem;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
-                        <span style="color: var(--color-text); font-weight: 700; font-size: 0.9rem;">⏱️ Time Complexity</span>
-                        {performance_badge}
-                    </div>
-                    <p style="margin: 0 0 0.4rem 0; color: #f59e0b; font-family: var(--font-family-mono); font-size: 1.15rem; font-weight: 700;">
-                        {code_analysis['time_complexity']}
-                    </p>
-                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.6; font-size: 0.85rem;">
-                        {code_analysis['time_explanation']}
-                    </p>
-                </div>
-        ''')
-    
-    if code_analysis['space_complexity']:
-        html_parts.append(f'''
-                <div style="background: rgba(139, 92, 246, 0.08); padding: 0.8rem; border-radius: 6px;">
-                    <span style="color: var(--color-text); font-weight: 700; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">💾 Space Complexity</span>
-                    <p style="margin: 0 0 0.4rem 0; color: #8b5cf6; font-family: var(--font-family-mono); font-size: 1.15rem; font-weight: 700;">
-                        {code_analysis['space_complexity']}
-                    </p>
-                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.6; font-size: 0.85rem;">
-                        {code_analysis['space_explanation']}
-                    </p>
-                </div>
-        ''')
-    
-    html_parts.append('</div></div></div>')
-    
-    # ═══════════════════════════════════════════════════════════
-    # BOX 2: STEP-BY-STEP EXECUTION (Full Width - Main Content)
-    # ═══════════════════════════════════════════════════════════
-    html_parts.append('''
-    <div class="issue-card" style="margin-bottom: 1rem; padding: 1rem 1.2rem; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%); border-left: 4px solid #22c55e;">
-        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
-            <span class="issue-badge" style="background: linear-gradient(135deg, #22c55e, #10b981); color: white; padding: 0.4rem 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(34,197,94,0.3);">
-                🔍 STEP-BY-STEP EXECUTION FLOW
-            </span>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 0.8rem;">
-    ''')
-    
-    for i, step in enumerate(code_analysis['steps'], 1):
-        color_map = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#ec4899', '#10b981']
-        step_color = color_map[(i - 1) % len(color_map)]
-        
-        html_parts.append(f'''
-        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255,255,255,0.1); border-left: 3px solid {step_color}; border-radius: 8px; padding: 0.9rem; transition: all 0.2s;">
-            <div style="display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.7rem;">
-                <span style="background: {step_color}; color: white; padding: 0.35rem 0.7rem; border-radius: 8px; font-weight: 800; font-size: 0.9rem; min-width: 32px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
-                    {i}
-                </span>
-                <div style="flex: 1;">
-                    <h4 style="margin: 0 0 0.5rem 0; color: var(--color-text); font-weight: 700; font-size: 1rem; line-height: 1.4;">
-                        {step['title']}
-                    </h4>
-                    <p style="margin: 0; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
-                        {step['explanation']}
-                    </p>
-                </div>
-            </div>
+        <div style="margin-bottom: 1rem;">
+            <h3 style="color: var(--color-text); font-size: 1rem; font-weight: 700; margin: 0 0 0.5rem 0;">
+                <span style="background: #10b981; color: white; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.85rem; margin-right: 0.5rem; display: inline-block; min-width: 26px; text-align: center;">{i}</span>
+                {step_title}
+            </h3>
+            <p style="color: var(--color-text-secondary); font-size: 0.9rem; line-height: 1.6; margin: 0 0 0.6rem 0; padding-left: 2.5rem;">
+                {step_explanation}
+            </p>
         ''')
         
-        if step.get('code_block'):
-            safe_code = step['code_block'].replace('<', '&lt;').replace('>', '&gt;')
+        if step_code:
+            safe_step_code = step_code.replace('<', '&lt;').replace('>', '&gt;')
             html_parts.append(f'''
-            <div style="background: var(--color-charcoal-800); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 0.7rem; margin: 0.6rem 0; overflow-x: auto;">
-                <pre style="margin: 0; font-family: var(--font-family-mono); font-size: 0.88rem; color: var(--color-text); line-height: 1.6;"><code>{safe_code}</code></pre>
+            <div style="background: #1e293b; border-radius: 6px; padding: 0.7rem; margin: 0.5rem 0 0.5rem 2.5rem; border-left: 3px solid #10b981;">
+                <pre style="margin: 0; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #e2e8f0; line-height: 1.5; overflow-x: auto;"><code>{safe_step_code}</code></pre>
             </div>
             ''')
         
-        if step.get('why'):
+        if step_why:
             html_parts.append(f'''
-            <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06)); border-left: 3px solid #3b82f6; padding: 0.7rem; border-radius: 6px; margin-top: 0.6rem;">
-                <p style="margin: 0; color: var(--color-text); line-height: 1.65; font-size: 0.88rem;">
-                    <strong style="color: #3b82f6; font-weight: 700;">💡 Why This Matters:</strong> {step['why']}
+            <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05)); padding: 0.7rem; border-radius: 6px; margin: 0.5rem 0 0 2.5rem; border-left: 3px solid #f59e0b;">
+                <p style="margin: 0; color: var(--color-text); font-size: 0.85rem; line-height: 1.6;">
+                    <strong style="color: #f59e0b; font-weight: 700;">💡 Why:</strong> {step_why}
                 </p>
             </div>
             ''')
         
         html_parts.append('</div>')
     
-    html_parts.append('</div></div>')
+    html_parts.append('</div>')
     
-    # ═══════════════════════════════════════════════════════════
-    # BOX 3: KEY INSIGHTS (Combined Bottom Section)
-    # ═══════════════════════════════════════════════════════════
-    html_parts.append('''
-    <div class="issue-card" style="margin-bottom: 0.5rem; padding: 1rem 1.2rem; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); border-left: 4px solid #8b5cf6;">
-        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem;">
-            <span class="issue-badge" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; padding: 0.4rem 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(139,92,246,0.3);">
-                💡 KEY INSIGHTS & IMPORTANT NOTES
-            </span>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
-    ''')
+    # Performance Analysis
+    if code_analysis.get('time_complexity') or code_analysis.get('space_complexity'):
+        html_parts.append('''
+        <div style="margin-bottom: 1.2rem;">
+            <h2 style="color: #f59e0b; font-size: 1.3rem; font-weight: 700; margin: 0 0 0.6rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 0.3rem 0.6rem; border-radius: 8px; color: white;">⚡</span>
+                Performance Analysis
+            </h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+        ''')
+        
+        if code_analysis.get('time_complexity'):
+            html_parts.append(f'''
+                <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05)); padding: 0.9rem; border-radius: 8px; border-left: 3px solid #f59e0b;">
+                    <div style="color: #f59e0b; font-weight: 700; font-size: 0.8rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        ⏱️ Time Complexity
+                    </div>
+                    <div style="color: var(--color-text); font-family: 'Consolas', monospace; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">
+                        {code_analysis['time_complexity']}
+                    </div>
+                    <p style="margin: 0; color: var(--color-text-secondary); font-size: 0.85rem; line-height: 1.5;">
+                        {code_analysis.get('time_explanation', '')}
+                    </p>
+                </div>
+            ''')
+        
+        if code_analysis.get('space_complexity'):
+            html_parts.append(f'''
+                <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05)); padding: 0.9rem; border-radius: 8px; border-left: 3px solid #8b5cf6;">
+                    <div style="color: #8b5cf6; font-weight: 700; font-size: 0.8rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        💾 Space Complexity
+                    </div>
+                    <div style="color: var(--color-text); font-family: 'Consolas', monospace; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">
+                        {code_analysis['space_complexity']}
+                    </div>
+                    <p style="margin: 0; color: var(--color-text-secondary); font-size: 0.85rem; line-height: 1.5;">
+                        {code_analysis.get('space_explanation', '')}
+                    </p>
+                </div>
+            ''')
+        
+        html_parts.append('</div></div>')
     
-    # Left column: Insights & Optimizations
-    html_parts.append('<div>')
+    # Key Concepts/Insights
     if code_analysis.get('insights'):
         html_parts.append('''
-            <h3 style="margin: 0 0 0.7rem 0; color: var(--color-text); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
-                <span style="background: #8b5cf6; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem;">🎯</span>
-                Key Takeaways
-            </h3>
+        <div style="margin-bottom: 1.2rem;">
+            <h2 style="color: #8b5cf6; font-size: 1.3rem; font-weight: 700; margin: 0 0 0.6rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); padding: 0.3rem 0.6rem; border-radius: 8px; color: white;">💡</span>
+                Key Concepts Highlighted
+            </h2>
+            <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05)); padding: 0.9rem; border-radius: 8px; border-left: 3px solid #8b5cf6;">
         ''')
-        html_parts.append('<ul style="margin: 0; padding-left: 0; list-style: none;">')
+        
         for insight in code_analysis['insights']:
             html_parts.append(f'''
-                <li style="margin: 0 0 0.7rem 0; padding-left: 1.8rem; position: relative; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
-                    <span style="position: absolute; left: 0; top: 0.1rem; color: #8b5cf6; font-weight: 700;">▸</span>
-                    {insight}
-                </li>
+                <div style="margin-bottom: 0.6rem; padding-left: 1.2rem; position: relative;">
+                    <span style="position: absolute; left: 0; top: 0.15rem; color: #8b5cf6; font-size: 1rem;">●</span>
+                    <p style="margin: 0; color: var(--color-text); font-size: 0.9rem; line-height: 1.6;">
+                        {insight}
+                    </p>
+                </div>
             ''')
-        html_parts.append('</ul>')
+        
+        html_parts.append('</div></div>')
     
-    if code_analysis.get('optimizations'):
+    # Potential Improvements
+    if code_analysis.get('optimizations') or code_analysis.get('edge_cases'):
         html_parts.append('''
-            <h3 style="margin: 1.2rem 0 0.7rem 0; color: var(--color-text); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
-                <span style="background: #22c55e; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem;">🚀</span>
-                Potential Optimizations
-            </h3>
+        <div style="margin-bottom: 1rem;">
+            <h2 style="color: #ec4899; font-size: 1.3rem; font-weight: 700; margin: 0 0 0.6rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="background: linear-gradient(135deg, #ec4899, #db2777); padding: 0.3rem 0.6rem; border-radius: 8px; color: white;">🚀</span>
+                Potential Improvements or Notes
+            </h2>
         ''')
-        html_parts.append('<ul style="margin: 0; padding-left: 0; list-style: none;">')
-        for opt in code_analysis['optimizations']:
-            html_parts.append(f'''
-                <li style="margin: 0 0 0.7rem 0; padding-left: 1.8rem; position: relative; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
-                    <span style="position: absolute; left: 0; top: 0.1rem; color: #22c55e; font-weight: 700;">▸</span>
-                    {opt}
-                </li>
-            ''')
-        html_parts.append('</ul>')
-    html_parts.append('</div>')
-    
-    # Right column: Edge Cases & When to Use
-    html_parts.append('<div>')
-    if code_analysis.get('edge_cases'):
-        html_parts.append('''
-            <h3 style="margin: 0 0 0.7rem 0; color: var(--color-text); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
-                <span style="background: #ef4444; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.85rem;">⚠️</span>
-                Edge Cases to Handle
-            </h3>
-        ''')
-        html_parts.append('<ul style="margin: 0; padding-left: 0; list-style: none;">')
-        for edge in code_analysis['edge_cases']:
-            html_parts.append(f'''
-                <li style="margin: 0 0 0.7rem 0; padding-left: 1.8rem; position: relative; color: var(--color-text-secondary); line-height: 1.7; font-size: 0.9rem;">
-                    <span style="position: absolute; left: 0; top: 0.1rem; color: #ef4444; font-weight: 700;">▸</span>
-                    {edge}
-                </li>
-            ''')
-        html_parts.append('</ul>')
         
-        # Practical application tips
-        html_parts.append('<div style="margin-top: 1.2rem; background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05)); border-left: 3px solid #8b5cf6; padding: 0.9rem; border-radius: 6px;">')
-        html_parts.append('<h4 style="margin: 0 0 0.5rem 0; color: #8b5cf6; font-size: 0.95rem; font-weight: 700;">💭 When to Use This Approach:</h4>')
+        improvements = code_analysis.get('optimizations', []) + code_analysis.get('edge_cases', [])
+        if improvements:
+            html_parts.append('<div style="background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(236, 72, 153, 0.05)); padding: 0.9rem; border-radius: 8px; border-left: 3px solid #ec4899;">')
+            for improvement in improvements:
+                html_parts.append(f'''
+                    <div style="margin-bottom: 0.6rem; padding-left: 1.2rem; position: relative;">
+                        <span style="position: absolute; left: 0; top: 0.15rem; color: #ec4899; font-size: 1rem;">●</span>
+                        <p style="margin: 0; color: var(--color-text); font-size: 0.9rem; line-height: 1.6;">
+                            {improvement}
+                        </p>
+                    </div>
+                ''')
+            html_parts.append('</div>')
         
-        practical_uses = ""
-        if 'BFS' in str(code_analysis.get('summary', '')):
-            practical_uses = "Perfect for shortest path problems, level-order tree traversal, finding minimum steps, exploring all neighbors before going deeper."
-        elif 'DFS' in str(code_analysis.get('summary', '')):
-            practical_uses = "Ideal for path finding, cycle detection, topological sorting, exploring all possible solutions, backtracking problems."
-        elif 'Dynamic Programming' in str(code_analysis.get('summary', '')):
-            practical_uses = "Essential for optimization problems with overlapping subproblems, fibonacci-like sequences, knapsack problems, longest subsequences."
-        elif 'Binary Search' in str(code_analysis.get('summary', '')):
-            practical_uses = "Best for searching in sorted arrays, finding boundaries, rotated array searches, optimization on answer space."
-        elif 'Sorting' in str(code_analysis.get('summary', '')):
-            practical_uses = "Required for ordering data, preprocessing for binary search, finding duplicates/unique elements, range queries."
-        else:
-            practical_uses = "Use this approach when the problem structure matches the algorithm's strengths and constraints."
-        
-        html_parts.append(f'<p style="margin: 0; color: var(--color-text); line-height: 1.7; font-size: 0.88rem;">{practical_uses}</p>')
         html_parts.append('</div>')
-    html_parts.append('</div>')
     
-    html_parts.append('</div></div>')
+    # Summary
+    html_parts.append(f'''
+    <div style="margin-top: 1.2rem;">
+        <h2 style="color: #06b6d4; font-size: 1.3rem; font-weight: 700; margin: 0 0 0.6rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="background: linear-gradient(135deg, #06b6d4, #0891b2); padding: 0.3rem 0.6rem; border-radius: 8px; color: white;">📝</span>
+            Summary
+        </h2>
+        <p style="color: var(--color-text); font-size: 0.95rem; line-height: 1.6; margin: 0; background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(6, 182, 212, 0.05)); padding: 0.9rem; border-radius: 8px; border-left: 3px solid #06b6d4;">
+            {code_analysis.get('summary', 'This code demonstrates fundamental programming concepts and can be used as a building block for more complex applications.')}
+        </p>
+    </div>
+    ''')
     
     return "".join(html_parts)
 
@@ -2166,9 +2624,14 @@ def analyze_edge_cases_and_optimizations(code, language):
 @app.route("/explain", methods=["POST"])
 def explain_code():
     """Generate comprehensive code explanations using the new 4-box system"""
+    print("\n" + "="*60)
+    print("📝 EXPLAIN ROUTE CALLED")
+    print("="*60)
     data = request.get_json() or {}
     code = data.get("code", "")
     language = data.get("language", "python").lower().strip()
+    print(f"📌 Code length: {len(code)} chars")
+    print(f"📌 Language: {language}")
 
     if not code:
         return jsonify({"explanation": "⚠️ No code provided."}), 400
@@ -2634,9 +3097,16 @@ def extract_key_concepts(code, language):
 @app.route('/explain_html', methods=['POST'])
 def explain_html():
     """Generate comprehensive code explanations with beautiful colored boxes like AI assistants"""
+    print("\n" + "="*60)
+    print("🎨 EXPLAIN_HTML ROUTE CALLED")
+    print("="*60)
+    
     data = request.get_json() or {}
     code = data.get("code", "")
     language = data.get("language", "python").lower().strip()
+    
+    print(f"📌 Code length: {len(code)} chars")
+    print(f"📌 Language: {language}")
 
     if not code:
         return jsonify({"html": "<div style='color:red;'>⚠️ No code provided.</div>"}), 400

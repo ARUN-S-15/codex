@@ -17,50 +17,72 @@
   <nav>
     <div class="logo">⚡ CODEX ⚡</div>
     <ul>
-      <li><a href="{{ url_for('main') }}">History</a></li>
+      <li><a href="{{ url_for('main') }}">Dashboard</a></li>
       <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
-      <li><a href="#">About</a></li>
-      <li><a href="#">Contact</a></li>
-      <li><a href="{{ url_for('login') }}">Login</a></li>
-      <li><a href="{{ url_for('login') }}">Logout</a></li>
+      <li><a href="{{ url_for('practice') }}">Practice</a></li>
+      <li><a href="{{ url_for('my_projects') }}">My Projects</a></li>
+      <li><a href="{{ url_for('profile') }}">Profile</a></li>
+      <li><a href="{{ url_for('logout') }}">Logout</a></li>
     </ul>
   </nav>
 
   <header>
     <h1>⚡ CODEX ⚡</h1>
-    <p>Your AI Code Explainer & Debugger</p>
+    <p>Your AI-Powered Coding Platform</p>
+    <p style="font-size: 1rem; margin-top: 10px; opacity: 0.9;">
+      Compile • Debug • Optimize • Practice • Learn
+    </p>
 
     <!-- Add the Get Started button -->
     <div class="cta-section">
-  <a href="{{ url_for('compiler') }}" class="cta-button">
-    <span class="button-text">Start your journey</span>
-    <span class="button-icon">→</span>
-  </a>
-  <p class="cta-description">Start analyzing and debugging your code instantly</p>
-</div>
+      <a href="{{ url_for('compiler') }}" class="cta-button">
+        <span class="button-text">Start Coding Now</span>
+        <span class="button-icon">→</span>
+      </a>
+      <p class="cta-description">Write, compile, and execute code in 5 programming languages</p>
+    </div>
 
+    <!-- Quick Stats -->
+    <div style="margin-top: 30px; display: flex; gap: 30px; justify-content: center; flex-wrap: wrap;">
+      <div style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: #00d9ff;">12</div>
+        <div style="font-size: 0.9rem; opacity: 0.8;">Practice Problems</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: #00d9ff;">5</div>
+        <div style="font-size: 0.9rem; opacity: 0.8;">Languages</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: #00d9ff;">AI</div>
+        <div style="font-size: 0.9rem; opacity: 0.8;">Powered</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: #00d9ff;">100%</div>
+        <div style="font-size: 0.9rem; opacity: 0.8;">Free</div>
+      </div>
+    </div>
   </header>
 
-  <!-- LANGUAGE SELECTION -->
+  <!-- FEATURE CARDS -->
   <section class="languages">
-    <a href="{{ url_for('compiler') }}?lang=c" class="lang-card">
-      <h2>COMPILER</h2>
-      <p>Debug and explain your C programs with ease.</p>
+    <a href="{{ url_for('compiler') }}" class="lang-card">
+      <h2>💻 COMPILER</h2>
+      <p>Write and execute code in 5 languages with real-time output.</p>
     </a>
 
-    <a href="{{ url_for('debug_code') }}?lang=cpp" class="lang-card">
-      <h2>DEBUGGER</h2>
-      <p>Handle complex OOP code and algorithms smoothly.</p>
+    <a href="{{ url_for('debugger_page') }}" class="lang-card">
+      <h2>🐛 DEBUGGER</h2>
+      <p>Find and fix bugs with AI-powered code analysis.</p>
     </a>
 
-    <a href="{{ url_for('optimizer') }}?lang=python" class="lang-card">
-      <h2>OPTIMIZER</h2>
-      <p>Get instant code explanations and fixes for Python.</p>
+    <a href="{{ url_for('optimizer') }}" class="lang-card">
+      <h2>⚡ OPTIMIZER</h2>
+      <p>Get performance improvements and code optimization tips.</p>
     </a>
 
-    <a href="{{ url_for('practice') }}?lang=java" class="lang-card">
-      <h2>PRACTICE</h2>
-      <p>Debug, explain and optimize your Java projects.</p>
+    <a href="{{ url_for('practice') }}" class="lang-card">
+      <h2>🎓 PRACTICE</h2>
+      <p>Solve 12 LeetCode-style problems to sharpen your skills.</p>
     </a>
   </section>
 
@@ -68,15 +90,32 @@
   <section class="details">
     <h2>About CODEX</h2>
     <p>
-      CODEX is your AI-powered companion for programming. Whether you're stuck with an error, want to optimize code, or need a line-by-line explanation, CODEX is here to help. Just select your programming language, paste your code or question, and let CODEX do the magic!
+      CODEX is your AI-powered companion for programming. Whether you're stuck with an error, want to optimize code, or need a line-by-line explanation, CODEX is here to help. With 12 practice problems, multi-language compiler, and Google Gemini AI integration, CODEX makes coding easier and more enjoyable!
     </p>
+    
+    <div style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+      <h3 style="margin-bottom: 15px;">✨ Key Features</h3>
+      <ul style="list-style: none; padding: 0;">
+        <li style="padding: 8px 0;">✅ <strong>Multi-Language Compiler:</strong> Python, C, C++, Java, JavaScript</li>
+        <li style="padding: 8px 0;">✅ <strong>12 Practice Problems:</strong> Easy, Medium, and Hard challenges</li>
+        <li style="padding: 8px 0;">✅ <strong>AI Code Assistant:</strong> Powered by Google Gemini 2.0 Flash</li>
+        <li style="padding: 8px 0;">✅ <strong>Project Management:</strong> Save, share, and manage your code</li>
+        <li style="padding: 8px 0;">✅ <strong>Smart Debugger:</strong> Find and fix bugs automatically</li>
+        <li style="padding: 8px 0;">✅ <strong>Code Optimizer:</strong> Improve performance and readability</li>
+      </ul>
+    </div>
   </section>
 
   <!-- FOOTER -->
   <footer>
-    <p>&copy; 2024 CODEX. All rights reserved. | 
-      <a href="#">Privacy Policy</a> | 
-      <a href="#">Terms of Service</a>
+    <p>&copy; 2025 CODEX. All rights reserved. | 
+      <a href="{{ url_for('main') }}">Dashboard</a> | 
+      <a href="{{ url_for('compiler') }}">Compiler</a> | 
+      <a href="{{ url_for('practice') }}">Practice</a> | 
+      <a href="{{ url_for('my_projects') }}">My Projects</a>
+    </p>
+    <p style="margin-top: 10px; font-size: 0.85rem; opacity: 0.7;">
+      Powered by Judge0 API & Google Gemini AI
     </p>
   </footer>
 </body>

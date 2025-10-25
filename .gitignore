@@ -62,3 +62,11 @@ htmlcov/
 *.tmp
 temp/
 tmp/
+*.backup
+
+# Uploaded files
+static/uploads/profiles/*
+!static/uploads/profiles/.gitkeep
+
+# Judge0
+Judge0/

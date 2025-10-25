@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login & Signup Form</title>
+  <title>CODEX - Login & Register</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style/login.css') }}">
   <script src="https://unpkg.com/boxicons@2.1.4/dist/boxicons.js"></script>
 </head>
@@ -14,7 +14,7 @@
 
     <!-- Login Form -->
     <div class="form-box Login">
-      <h2 class="animation" style="--D:0; --S:21">Login</h2>
+      <h2 class="animation" style="--D:0; --S:21">⚡ Login to CODEX</h2>
       {% if error %}
       <div class="error-msg animation" style="--D:1; --S:22; color: #ff5459; background: rgba(255,84,89,0.1); padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;">
         ❌ {{ error }}
@@ -34,11 +34,11 @@
         </div>
 
         <div class="input-box animation" style="--D:3; --S:24">
-          <button class="btn" type="submit">Login</button>
+          <button class="btn" type="submit">Login Now</button>
         </div>
 
         <div class="regi-link animation" style="--D:4; --S:25">
-          <p>Don't have an account? <br> <a href="{{ url_for('register') }}" class="SignUpLink">Sign Up</a></p>
+          <p>Don't have an account? <br> <a href="#" class="SignUpLink">Create Account</a></p>
         </div>
       </form>
     </div>
@@ -46,36 +46,60 @@
     <!-- Login Info -->
     <div class="info-content Login">
       <h2 class="animation" style="--D:0; --S:20">WELCOME BACK!</h2>
-      <p class="animation" style="--D:1; --S:21">We are happy to have you with us again. If you need anything, we are here to help.</p>
+      <p class="animation" style="--D:1; --S:21">
+        Login to access your coding workspace with AI-powered features:
+      </p>
+      <ul class="animation" style="--D:2; --S:22; text-align: left; margin-top: 20px; padding-left: 30px;">
+        <li>💻 Multi-language compiler</li>
+        <li>🎓 12 practice problems</li>
+        <li>🤖 AI code assistance</li>
+        <li>💾 Save & share projects</li>
+      </ul>
     </div>
 
     <!-- Register Form -->
     <div class="form-box Register">
-      <h2 class="animation" style="--li:17; --S:0">Register</h2>
-      <form action="#">
+      <h2 class="animation" style="--li:17; --S:0">⚡ Join CODEX</h2>
+      {% if register_error %}
+      <div class="error-msg animation" style="--li:18; --S:1; color: #ff5459; background: rgba(255,84,89,0.1); padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;">
+        ❌ {{ register_error }}
+      </div>
+      {% endif %}
+      {% if success %}
+      <div class="success-msg animation" style="--li:18; --S:1; color: #4ade80; background: rgba(74,222,128,0.1); padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;">
+        ✅ {{ success }}
+      </div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('register') }}">
         <div class="input-box animation" style="--li:18; --S:1">
-          <input type="text" required>
+          <input type="text" name="username" required minlength="3">
           <label>Username</label>
           <box-icon type='solid' name='user' color="gray"></box-icon>
         </div>
 
         <div class="input-box animation" style="--li:19; --S:2">
-          <input type="email" required>
+          <input type="email" name="email" required>
           <label>Email</label>
           <box-icon name='envelope' type='solid' color="gray"></box-icon>
         </div>
 
         <div class="input-box animation" style="--li:19; --S:3">
-          <input type="password" required>
-          <label>Password</label>
+          <input type="password" name="password" required minlength="6">
+          <label>Password (min 6 characters)</label>
           <box-icon name='lock-alt' type='solid' color="gray"></box-icon>
         </div>
 
         <div class="input-box animation" style="--li:20; --S:4">
-          <button class="btn" type="submit">Register</button>
+          <input type="password" name="confirm_password" required minlength="6">
+          <label>Confirm Password</label>
+          <box-icon name='lock-alt' type='solid' color="gray"></box-icon>
         </div>
 
-        <div class="regi-link animation" style="--li:21; --S:5">
+        <div class="input-box animation" style="--li:21; --S:5">
+          <button class="btn" type="submit">Create Account</button>
+        </div>
+
+        <div class="regi-link animation" style="--li:22; --S:6">
           <p>Already have an account? <br> <a href="#" class="SignInLink">Sign In</a></p>
         </div>
       </form>
@@ -83,11 +107,36 @@
 
     <!-- Register Info -->
     <div class="info-content Register">
-      <h2 class="animation" style="--li:17; --S:0">WELCOME!</h2>
-      <p class="animation" style="--li:18; --S:1">We’re delighted to have you here. If you need any assistance, feel free to reach out.</p>
+      <h2 class="animation" style="--li:17; --S:0">JOIN US TODAY!</h2>
+      <p class="animation" style="--li:18; --S:1">
+        Create your free account and start coding with our powerful platform:
+      </p>
+      <ul class="animation" style="--li:19; --S:2; text-align: left; margin-top: 20px; padding-left: 30px;">
+        <li>✅ Compile in 5 languages</li>
+        <li>✅ Practice LeetCode problems</li>
+        <li>✅ AI-powered debugging</li>
+        <li>✅ Code optimization tips</li>
+        <li>✅ 100% Free forever</li>
+      </ul>
     </div>
   </div>
 
   <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script>
+    // Toggle between login and register forms
+    const container = document.querySelector('.container');
+    const signUpLink = document.querySelector('.SignUpLink');
+    const signInLink = document.querySelector('.SignInLink');
+
+    signUpLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      container.classList.add('active');
+    });
+
+    signInLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      container.classList.remove('active');
+    });
+  </script>
 </body>
 </html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - CODEX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style/login.css') }}">
+    <style>
+        .message-container {
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .message-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .message-icon.success { color: #4CAF50; }
+        .message-icon.error { color: #f44336; }
+        .message-icon.info { color: #2196F3; }
+        
+        .message-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .message-text {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        
+        .message-text a {
+            color: #5046e4;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .message-text a:hover {
+            text-decoration: underline;
+        }
+        
+        .btn-back {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #5046e4;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-back:hover {
+            background: #3d36b8;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="message-container">
+        <div class="message-icon {{ type }}">
+            {% if type == 'success' %}
+                ✓
+            {% elif type == 'error' %}
+                ✗
+            {% else %}
+                ℹ
+            {% endif %}
+        </div>
+        <div class="message-title">{{ title }}</div>
+        <div class="message-text">{{ message | safe }}</div>
+        <a href="{{ url_for('login') }}" class="btn-back">Go to Login</a>
+    </div>
+</body>
+</html>
