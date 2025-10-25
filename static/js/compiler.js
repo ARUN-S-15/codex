@@ -842,6 +842,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (explainBtn && explanationSection && explanationBox) {
     console.log("Explain button listener attached successfully");
+    
+    // Close button handler
+    const closeExplainBtn = document.getElementById("closeExplainBtn");
+    if (closeExplainBtn) {
+      closeExplainBtn.addEventListener("click", () => {
+        explanationSection.classList.add("hidden");
+      });
+    }
+    
     explainBtn.addEventListener("click", async () => {
       console.log("Explain button clicked!");
       const code = codeEditor.value.trim();
@@ -849,18 +858,31 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageValue = (languageText || "").toLowerCase();
 
       explanationSection.classList.remove("hidden");
+      explanationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       if (!code) {
-        explanationBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ Please write some code to explain!</div>';
+        explanationBox.innerHTML = `
+          <div class="explain-placeholder" style="padding: 3rem 2rem; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; color: #ffa500;">⚠️</div>
+            <p style="color: #ffa500; font-size: 1.1rem; font-weight: 500;">Please write some code to explain!</p>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 0.5rem;">Enter your code in the editor above and try again.</p>
+          </div>
+        `;
         return;
       }
 
-      // Show loading state
+      // Show loading state with animation
       const originalText = explainBtn.innerHTML;
       explainBtn.disabled = true;
       explainBtn.innerHTML = "⏳ Analyzing...";
 
-      explanationBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">💡 Analyzing your code...<br>⏳ Please wait...</div>';
+      explanationBox.innerHTML = `
+        <div class="explain-loading">
+          <div class="explain-loading-icon">🤖</div>
+          <p>Analyzing your code...</p>
+          <p class="explain-loading-subtitle">AI is thinking... This may take a few seconds</p>
+        </div>
+      `;
 
       try {
         // Try the new colorful HTML endpoint first
