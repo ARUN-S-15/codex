@@ -205,6 +205,45 @@ document.addEventListener("DOMContentLoaded", () => {
   const debugSection = document.getElementById("debugSection"); // might not exist
   const debugBox = document.getElementById("debugOutput"); // might not exist
 
+  // ---- BOTTOM SHEET HELPERS ----
+  // Function to close/hide the output section
+  const closeOutput = () => {
+    if (resultSection) {
+      resultSection.classList.remove("show");
+      resultSection.classList.add("hidden");
+    }
+  };
+  
+  // Function to open/show the output section
+  const openOutput = () => {
+    if (resultSection) {
+      resultSection.classList.remove("hidden");
+      setTimeout(() => {
+        resultSection.classList.add("show");
+      }, 10);
+    }
+  };
+  
+  // Setup output section close button
+  const closeOutputBtn = document.getElementById("closeOutputBtn");
+  const outputHeader = document.querySelector(".output-header");
+  
+  if (closeOutputBtn) {
+    closeOutputBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeOutput();
+    });
+  }
+  
+  // Click header to toggle (pull down to close)
+  if (outputHeader) {
+    outputHeader.addEventListener("click", () => {
+      if (resultSection && resultSection.classList.contains("show")) {
+        closeOutput();
+      }
+    });
+  }
+
   // ---- OLD TAB CODE (DISABLED - NO LONGER USED) ----
   // Tabs functionality removed per user request
 
@@ -236,9 +275,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear the editor
       codeMirrorEditor.setValue("");
       
-      // Hide result sections
-      if (resultSection) resultSection.classList.add("hidden");
-      if (explanationSection) explanationSection.classList.add("hidden");
+      // Hide result sections (use bottom sheet close)
+      closeOutput();
+      if (explanationSection) {
+        explanationSection.classList.remove("show");
+        explanationSection.classList.add("hidden");
+      }
       if (debugSection) debugSection.classList.add("hidden");
     });
   }
@@ -353,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
       isWaitingForInput = false;
       inputPrompts = [];
       
-      resultSection.classList.remove("hidden");
+      openOutput(); // Show output section with slide-up animation
       terminalInputLine.style.display = "none";
 
       if (!code) {
@@ -845,9 +887,35 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Close button handler
     const closeExplainBtn = document.getElementById("closeExplainBtn");
+    const explainHeader = document.querySelector(".explain-header");
+    
+    // Function to close/hide the explanation section
+    const closeExplanation = () => {
+      explanationSection.classList.remove("show");
+      explanationSection.classList.add("hidden");
+    };
+    
+    // Function to open/show the explanation section
+    const openExplanation = () => {
+      explanationSection.classList.remove("hidden");
+      setTimeout(() => {
+        explanationSection.classList.add("show");
+      }, 10);
+    };
+    
     if (closeExplainBtn) {
-      closeExplainBtn.addEventListener("click", () => {
-        explanationSection.classList.add("hidden");
+      closeExplainBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeExplanation();
+      });
+    }
+    
+    // Click header to toggle (pull down to close)
+    if (explainHeader) {
+      explainHeader.addEventListener("click", () => {
+        if (explanationSection.classList.contains("show")) {
+          closeExplanation();
+        }
       });
     }
     
@@ -857,15 +925,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || languageSelect.value;
       const languageValue = (languageText || "").toLowerCase();
 
-      // Show the section first
-      console.log("Removing hidden class from explanationSection");
-      explanationSection.classList.remove("hidden");
-      console.log("explanationSection display:", window.getComputedStyle(explanationSection).display);
-      
-      // Scroll to it
-      setTimeout(() => {
-        explanationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+      // Show the section with slide-up animation
+      console.log("Opening explanation section with slide-up animation");
+      openExplanation();
 
       if (!code) {
         explanationBox.innerHTML = `
@@ -1239,10 +1301,10 @@ document.addEventListener("DOMContentLoaded", () => {
       updateLineNumbers();
       updateSyntaxHighlight();
       
-      // Show output if available
+      // Show output if available (use bottom sheet animation)
       if (data.output && resultBox && resultSection) {
         resultBox.textContent = data.output;
-        resultSection.classList.remove('hidden');
+        openOutput();
       }
 
       // Scroll to top
