@@ -30,6 +30,11 @@ app = Flask(__name__)
 # Use environment variable for secret key, fallback to generated key if not found
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())
 
+# Session configuration - make sessions permanent (30 days)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
 # Configuration from environment
 app.config['DB_TYPE'] = os.getenv('DB_TYPE', 'mysql')
 app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
@@ -94,6 +99,7 @@ def login():
         
         if user and check_password_hash(user[2], password):
             # Login successful
+            session.permanent = True
             session['user_id'] = user[0]
             session['username'] = user[1]
             
@@ -288,6 +294,7 @@ def google_callback():
             
             if user:
                 # Existing user - login
+                session.permanent = True
                 session['user_id'] = user[0]
                 session['username'] = user[1]
                 execute_query('UPDATE users SET last_login = NOW() WHERE id = ?', (user[0],))
@@ -306,6 +313,7 @@ def google_callback():
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (username, email, '', True, 'google', google_id, picture))
                 
+                session.permanent = True
                 session['user_id'] = user_id
                 session['username'] = username
             
@@ -357,6 +365,7 @@ def github_callback():
             
             if user:
                 # Existing user - login
+                session.permanent = True
                 session['user_id'] = user[0]
                 session['username'] = user[1]
                 execute_query('UPDATE users SET last_login = NOW() WHERE id = ?', (user[0],))
@@ -374,6 +383,7 @@ def github_callback():
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (username, email or f"{username}@github.com", '', True, 'github', github_id, picture))
                 
+                session.permanent = True
                 session['user_id'] = user_id
                 session['username'] = username
             
