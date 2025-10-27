@@ -1486,8 +1486,12 @@
 <body>
   <!-- Pass user login status to JavaScript -->
   <script>
-    window.USER_LOGGED_IN = {{ 'true' if user_logged_in else 'false' }};
-    window.USERNAME = {{ ("'" + username + "'") if username else 'null' }};
+    // Debug: Check what values we're getting from server
+    console.log('SERVER VALUES - user_logged_in:', {{ user_logged_in|tojson }}, 'username:', {{ username|tojson }});
+    
+    window.USER_LOGGED_IN = {{ user_logged_in|tojson }};
+    window.USERNAME = {{ username|tojson }};
+    
     console.log('🔐 User Login Status:', window.USER_LOGGED_IN);
     console.log('👤 Username:', window.USERNAME);
   </script>
