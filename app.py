@@ -64,7 +64,7 @@ def allowed_file(filename):
 
 def check_user():
     """Check if user is logged in"""
-    return session.get('username')
+    return 'user_id' in session and 'username' in session
 
 def require_email_verification(user_id):
     """Check if user's email is verified"""
@@ -602,9 +602,6 @@ def toggle_admin(user_id):
     
     return jsonify({"success": True, "is_admin": new_status})
 
-def check_user():
-    return session.get('username')
-
 @app.route("/main")
 def main():
     """Main landing page - accessible without login"""
@@ -617,7 +614,18 @@ def compiler():
     """Compiler page - accessible without login"""
     user_logged_in = check_user()
     username = session.get('username', None) if user_logged_in else None
+    print(f"DEBUG /compiler - user_logged_in: {user_logged_in}, username: {username}, session: {dict(session)}")
     return render_template("compiler.html", user_logged_in=user_logged_in, username=username)
+
+@app.route("/api/check-session")
+def check_session():
+    """Debug endpoint to check session status"""
+    return jsonify({
+        "logged_in": check_user(),
+        "username": session.get('username'),
+        "user_id": session.get('user_id'),
+        "session_keys": list(session.keys())
+    })
 
 @app.route("/debugger")
 def debugger_page():
