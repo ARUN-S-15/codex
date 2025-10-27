@@ -1488,6 +1488,8 @@
   <script>
     window.USER_LOGGED_IN = {{ 'true' if user_logged_in else 'false' }};
     window.USERNAME = {{ ("'" + username + "'") if username else 'null' }};
+    console.log('🔐 User Login Status:', window.USER_LOGGED_IN);
+    console.log('👤 Username:', window.USERNAME);
   </script>
 
   <!-- Mobile Menu Toggle Button -->
@@ -1606,6 +1608,6 @@
   </main>
 
   <!-- ✅ Better: move JS into a separate file -->
-  <script src="{{ url_for('static', filename='js/compiler.js') }}?v=5"></script>
+  <script src="{{ url_for('static', filename='js/compiler.js') }}?v=6"></script>
 </body>
 </html>
