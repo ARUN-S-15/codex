@@ -206,11 +206,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const debugBox = document.getElementById("debugOutput"); // might not exist
 
   // ---- BOTTOM SHEET HELPERS ----
-  // Function to close/hide the output section
+  // Function to close/hide the output section (minimize it to show header only)
   const closeOutput = () => {
     if (resultSection) {
       resultSection.classList.remove("show");
-      resultSection.classList.add("hidden");
+      resultSection.classList.remove("hidden");
+      resultSection.classList.add("minimized");
     }
   };
   
@@ -218,8 +219,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const openOutput = () => {
     if (resultSection) {
       resultSection.classList.remove("hidden");
+      resultSection.classList.remove("minimized");
       setTimeout(() => {
         resultSection.classList.add("show");
+        // Scroll to output section smoothly
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 10);
     }
   };
@@ -235,11 +239,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // Click header to toggle (pull down to close)
+  // Click header to toggle expand/collapse
   if (outputHeader) {
     outputHeader.addEventListener("click", () => {
-      if (resultSection && resultSection.classList.contains("show")) {
-        closeOutput();
+      if (resultSection) {
+        if (resultSection.classList.contains("show")) {
+          closeOutput(); // Collapse to minimized state
+        } else if (resultSection.classList.contains("minimized")) {
+          openOutput(); // Expand from minimized state
+        }
       }
     });
   }
@@ -275,10 +283,13 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear the editor
       codeMirrorEditor.setValue("");
       
-      // Hide result sections (use bottom sheet close)
-      closeOutput();
+      // Fully hide result sections (not just minimize)
+      if (resultSection) {
+        resultSection.classList.remove("show", "minimized");
+        resultSection.classList.add("hidden");
+      }
       if (explanationSection) {
-        explanationSection.classList.remove("show");
+        explanationSection.classList.remove("show", "minimized");
         explanationSection.classList.add("hidden");
       }
       if (debugSection) debugSection.classList.add("hidden");
@@ -288,6 +299,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // ---- SAVE & SHARE ----
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to save your code.\n\nCreate a free account to save and manage your projects.");
+        window.location.href = "/login";
+        return;
+      }
+      
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text;
       
@@ -329,6 +347,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (shareBtn) {
     shareBtn.addEventListener('click', async () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to share your code.\n\nCreate a free account to share your projects with others.");
+        window.location.href = "/login";
+        return;
+      }
+      
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text;
       
@@ -889,17 +914,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeExplainBtn = document.getElementById("closeExplainBtn");
     const explainHeader = document.querySelector(".explain-header");
     
-    // Function to close/hide the explanation section
+    // Function to close/hide the explanation section (minimize it to show header only)
     const closeExplanation = () => {
       explanationSection.classList.remove("show");
-      explanationSection.classList.add("hidden");
+      explanationSection.classList.remove("hidden");
+      explanationSection.classList.add("minimized");
     };
     
     // Function to open/show the explanation section
     const openExplanation = () => {
       explanationSection.classList.remove("hidden");
+      explanationSection.classList.remove("minimized");
       setTimeout(() => {
         explanationSection.classList.add("show");
+        // Scroll to explanation section smoothly
+        explanationSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 10);
     };
     
@@ -910,17 +939,29 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    // Click header to toggle (pull down to close)
+    // Click header to toggle expand/collapse
     if (explainHeader) {
       explainHeader.addEventListener("click", () => {
-        if (explanationSection.classList.contains("show")) {
-          closeExplanation();
+        if (explanationSection) {
+          if (explanationSection.classList.contains("show")) {
+            closeExplanation(); // Collapse to minimized state
+          } else if (explanationSection.classList.contains("minimized")) {
+            openExplanation(); // Expand from minimized state
+          }
         }
       });
     }
     
     explainBtn.addEventListener("click", async () => {
       console.log("Explain button clicked!");
+      
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to use the AI Explain feature.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
+        return;
+      }
+      
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || languageSelect.value;
       const languageValue = (languageText || "").toLowerCase();
@@ -1017,6 +1058,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // Send code to debug page via localStorage
   if (debugBtn) {
     debugBtn.addEventListener("click", () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to use the AI Debugger feature.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
+        return;
+      }
+      
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
       
@@ -1050,6 +1098,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const optimizeBtn = document.getElementById("optimizeBtn");
   if (optimizeBtn) {
     optimizeBtn.addEventListener("click", () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to use the AI Optimizer feature.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
+        return;
+      }
+      
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
       
@@ -1152,6 +1207,13 @@ document.addEventListener("DOMContentLoaded", () => {
   
   if (downloadCodeBtn && codeEditor && languageSelect) {
     downloadCodeBtn.addEventListener("click", () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to download your code.\n\nCreate a free account to download and save your projects.");
+        window.location.href = "/login";
+        return;
+      }
+      
       const code = codeEditor.value;
       
       if (!code) {
@@ -1465,5 +1527,47 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       alert('❌ Error loading project: ' + err.message);
     }
+  }
+
+  // ============================================
+  // MOBILE MENU TOGGLE
+  // ============================================
+  const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+  if (mobileMenuToggle && sidebar && sidebarOverlay) {
+    // Toggle sidebar on button click
+    mobileMenuToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('active');
+      sidebarOverlay.classList.toggle('active');
+      
+      // Change icon
+      if (sidebar.classList.contains('active')) {
+        mobileMenuToggle.textContent = '✕';
+      } else {
+        mobileMenuToggle.textContent = '☰';
+      }
+    });
+
+    // Close sidebar when overlay is clicked
+    sidebarOverlay.addEventListener('click', () => {
+      sidebar.classList.remove('active');
+      sidebarOverlay.classList.remove('active');
+      mobileMenuToggle.textContent = '☰';
+    });
+
+    // Close sidebar when a menu item is clicked (mobile)
+    const sidebarButtons = sidebar.querySelectorAll('button, .menu-item');
+    sidebarButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        // Only close on mobile (screen width < 768px)
+        if (window.innerWidth <= 768) {
+          sidebar.classList.remove('active');
+          sidebarOverlay.classList.remove('active');
+          mobileMenuToggle.textContent = '☰';
+        }
+      });
+    });
   }
 });

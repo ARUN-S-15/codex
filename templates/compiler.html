@@ -599,64 +599,72 @@
       overflow-x: auto;
     }
     
-    /* Modern Explain Section Redesign - Bottom Sheet Style */
+    /* Modern Explain Section Redesign - Normal Flow Below Compiler */
     #explanationSection {
-      position: fixed;
-      bottom: 0;
-      left: 280px; /* Account for sidebar width */
-      right: 0;
+      position: relative; /* Normal document flow, not fixed */
+      width: 100%;
       background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%);
-      border-radius: 20px 20px 0 0;
-      overflow: hidden;
-      box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.8);
-      z-index: 1000;
-      max-height: 70vh;
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
-      transform: translateY(100%);
-      opacity: 0;
+      border-radius: 20px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+      margin-top: 20px;
+      display: none; /* Hidden by default */
     }
     
     #explanationSection.show {
-      transform: translateY(0);
-      opacity: 1;
+      display: block; /* Visible when show class */
+      animation: slideDown 0.4s ease-out;
     }
     
     #explanationSection.hidden {
-      transform: translateY(100%);
-      opacity: 0;
-      pointer-events: none;
+      display: none;
     }
     
-    /* Output Section - Bottom Sheet Style (Semi-transparent, stays visible) */
-    #resultSection {
-      position: fixed;
-      bottom: 0;
-      left: 280px;
-      right: 0;
-      background: rgba(26, 26, 26, 0.85); /* Semi-transparent background */
-      backdrop-filter: blur(10px); /* Blur effect for transparency */
-      -webkit-backdrop-filter: blur(10px);
-      border-radius: 20px 20px 0 0;
+    #explanationSection.minimized {
+      display: block;
       overflow: hidden;
-      box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.8);
-      z-index: 999;
-      max-height: 70vh;
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      transform: translateY(100%);
+      max-height: 80px; /* Show only header */
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Output Section - Normal Flow Below Compiler */
+    #resultSection {
+      position: relative; /* Normal document flow, not fixed */
+      width: 100%;
+      background: rgba(26, 26, 26, 0.95); /* Slightly transparent */
+      border-radius: 20px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+      margin-top: 20px;
+      display: none; /* Hidden by default */
     }
     
     #resultSection.show {
-      transform: translateY(0);
+      display: block; /* Visible when show class */
+      animation: slideDown 0.4s ease-out;
     }
     
     #resultSection.hidden {
-      transform: translateY(100%);
-      pointer-events: none;
+      display: none;
     }
     
-    /* Output Header (Semi-transparent) */
+    #resultSection.minimized {
+      display: block;
+      overflow: hidden;
+      max-height: 80px; /* Show only header */
+    }
+    
+    /* Output Header */
     .output-header {
-      background: rgba(42, 43, 50, 0.9); /* Semi-transparent header */
+      background: rgba(42, 43, 50, 0.95);
       padding: 1.5rem 2rem;
       display: flex;
       align-items: center;
@@ -664,22 +672,7 @@
       border-bottom: 2px solid rgba(16, 163, 127, 0.3);
       cursor: pointer;
       position: relative;
-    }
-    
-    .output-header::before {
-      content: '';
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 60px;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 10px;
-    }
-    
-    .output-header:hover::before {
-      background: rgba(255, 255, 255, 0.6);
+      border-radius: 20px 20px 0 0;
     }
     
     .output-icon {
@@ -730,22 +723,7 @@
       border-bottom: 2px solid rgba(255, 255, 255, 0.1);
       cursor: pointer;
       position: relative;
-    }
-    
-    .explain-header::before {
-      content: '';
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 60px;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.5);
-      border-radius: 10px;
-    }
-    
-    .explain-header:hover::before {
-      background: rgba(255, 255, 255, 0.8);
+      border-radius: 20px 20px 0 0;
     }
     
     .explain-icon {
@@ -1319,10 +1297,206 @@
       opacity: 1 !important;
       -webkit-text-fill-color: #888 !important;
     }
+
+    /* ============================================ */
+    /* MOBILE RESPONSIVE STYLES */
+    /* ============================================ */
+    @media (max-width: 768px) {
+      /* Sidebar - hide by default on mobile, show as overlay when needed */
+      .sidebar {
+        position: fixed;
+        left: -280px; /* Hidden off-screen */
+        top: 0;
+        height: 100vh;
+        z-index: 2000;
+        transition: left 0.3s ease;
+      }
+
+      .sidebar.active {
+        left: 0; /* Slide in when active */
+      }
+
+      /* Main content takes full width */
+      .main {
+        margin-left: 0 !important;
+        width: 100%;
+      }
+
+      /* Explanation and output sections - adjust for mobile */
+      #explanationSection,
+      #resultSection {
+        left: 0 !important; /* Remove sidebar offset */
+        right: 0;
+        width: 100%;
+        border-radius: 15px 15px 0 0;
+      }
+
+      /* Code editor area */
+      .section {
+        padding: 1rem;
+      }
+
+      /* Buttons - make them touch-friendly */
+      button,
+      .btn {
+        min-height: 44px; /* iOS recommended touch target */
+        font-size: 1rem;
+        padding: 0.75rem 1.2rem;
+      }
+
+      /* Control buttons - stack on mobile */
+      .control-buttons {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .control-buttons button {
+        flex: 1 1 calc(50% - 0.5rem); /* 2 buttons per row */
+        min-width: 120px;
+      }
+
+      /* Header adjustments */
+      .welcome-message {
+        font-size: 0.9rem;
+      }
+
+      /* Language selector */
+      #languageSelect {
+        min-width: auto;
+        width: 100%;
+        max-width: 200px;
+      }
+
+      /* Explanation and output headers */
+      .explain-header,
+      .output-header {
+        padding: 1rem 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .explain-title,
+      .output-title {
+        font-size: 1.2rem;
+      }
+
+      .explain-subtitle,
+      .output-subtitle {
+        font-size: 0.8rem;
+      }
+
+      /* Close buttons - larger touch target */
+      .close-explain-btn,
+      .close-output-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+      }
+
+      /* Terminal/console output */
+      #terminalContainer {
+        font-size: 0.9rem;
+        padding: 1rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      /* Extra small devices - further adjustments */
+      .section {
+        padding: 0.5rem;
+      }
+
+      /* Stack control buttons vertically on very small screens */
+      .control-buttons button {
+        flex: 1 1 100%;
+        width: 100%;
+      }
+
+      /* Smaller text */
+      .explain-title,
+      .output-title {
+        font-size: 1rem;
+      }
+
+      .explain-icon,
+      .output-icon {
+        font-size: 1.5rem;
+      }
+
+      /* Adjust section heights for small screens */
+      #explanationSection.show,
+      #resultSection.show {
+        max-height: 60vh;
+      }
+    }
+
+    /* Landscape mode on mobile - optimize horizontal space */
+    @media (max-width: 900px) and (orientation: landscape) {
+      #explanationSection.show,
+      #resultSection.show {
+        max-height: 50vh;
+      }
+    }
+
+    /* Add mobile menu toggle button (shown only on mobile) */
+    .mobile-menu-toggle {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2001;
+      background: #10a37f;
+      border: none;
+      color: white;
+      padding: 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      font-size: 1.5rem;
+      width: 50px;
+      height: 50px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-menu-toggle {
+        display: flex;
+      }
+    }
+
+    /* Overlay to close sidebar on mobile */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1999;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar-overlay.active {
+        display: block;
+      }
+    }
   </style>
 </head>
 <body>
-  <aside class="sidebar">
+  <!-- Pass user login status to JavaScript -->
+  <script>
+    window.USER_LOGGED_IN = {{ 'true' if user_logged_in else 'false' }};
+    window.USERNAME = {{ ("'" + username + "'") if username else 'null' }};
+  </script>
+
+  <!-- Mobile Menu Toggle Button -->
+  <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+  
+  <!-- Sidebar Overlay (for closing sidebar on mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <aside class="sidebar" id="sidebar">
     <!-- Action Buttons -->
     <div class="sidebar-actions">
       <button id="newCodeBtn">📝 New</button>
@@ -1399,7 +1573,7 @@
         </div>
         <button id="closeOutputBtn" class="close-output-btn">✕</button>
       </div>
-      <div id="terminalContainer" style="position: relative; background: #0a0a0a; border-radius: 0; padding: 1.5rem; min-height: 200px; font-family: 'Consolas', 'Monaco', monospace; overflow-y: auto; max-height: 50vh;">
+      <div id="terminalContainer" style="position: relative; background: transparent; border-radius: 0; padding: 1.5rem; min-height: 200px; font-family: 'Consolas', 'Monaco', monospace; overflow-y: auto; max-height: 50vh;">
         <!-- Terminal output display -->
         <div id="terminalOutput" style="color: #ececf1; white-space: pre-wrap; word-wrap: break-word; margin-bottom: 2.5rem; padding-bottom: 1.5rem;">Your output will appear here...</div>
         

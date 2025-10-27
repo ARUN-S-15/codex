@@ -17,21 +17,31 @@
   <nav>
     <div class="logo">⚡ CODEX ⚡</div>
     <ul>
-      <li><a href="{{ url_for('main') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('main') }}">Home</a></li>
       <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
-      <li><a href="{{ url_for('practice') }}">Practice</a></li>
-      <li><a href="{{ url_for('my_projects') }}">My Projects</a></li>
-      <li><a href="{{ url_for('profile') }}">Profile</a></li>
-      <li><a href="{{ url_for('logout') }}">Logout</a></li>
+      {% if user_logged_in %}
+        <li><a href="{{ url_for('practice') }}">Practice</a></li>
+        <li><a href="{{ url_for('my_projects') }}">My Projects</a></li>
+        <li><a href="{{ url_for('profile') }}">Profile</a></li>
+        <li><a href="{{ url_for('logout') }}" style="background: #ff5459; padding: 8px 16px; border-radius: 5px;">Logout</a></li>
+      {% else %}
+        <li><a href="{{ url_for('login') }}" style="background: #00d9ff; color: #0a0e27; padding: 8px 16px; border-radius: 5px; font-weight: 600;">Login</a></li>
+      {% endif %}
     </ul>
   </nav>
 
   <header>
     <h1>⚡ CODEX ⚡</h1>
     <p>Your AI-Powered Coding Platform</p>
-    <p style="font-size: 1rem; margin-top: 10px; opacity: 0.9;">
-      Compile • Debug • Optimize • Practice • Learn
-    </p>
+    {% if user_logged_in %}
+      <p style="font-size: 1rem; margin-top: 10px; opacity: 0.9;">
+        Welcome back, <strong style="color: #00d9ff;">{{ username }}</strong>! 
+      </p>
+    {% else %}
+      <p style="font-size: 1rem; margin-top: 10px; opacity: 0.9;">
+        Compile • Debug • Optimize • Practice • Learn
+      </p>
+    {% endif %}
 
     <!-- Add the Get Started button -->
     <div class="cta-section">
@@ -70,6 +80,7 @@
       <p>Write and execute code in 5 languages with real-time output.</p>
     </a>
 
+    {% if user_logged_in %}
     <a href="{{ url_for('debugger_page') }}" class="lang-card">
       <h2>🐛 DEBUGGER</h2>
       <p>Find and fix bugs with AI-powered code analysis.</p>
@@ -84,6 +95,31 @@
       <h2>🎓 PRACTICE</h2>
       <p>Solve 12 LeetCode-style problems to sharpen your skills.</p>
     </a>
+    {% else %}
+    <div class="lang-card" style="opacity: 0.6; cursor: not-allowed; position: relative;">
+      <div style="position: absolute; top: 10px; right: 10px; background: #ff5459; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+        🔒 Login Required
+      </div>
+      <h2>🐛 DEBUGGER</h2>
+      <p>Find and fix bugs with AI-powered code analysis.</p>
+    </div>
+
+    <div class="lang-card" style="opacity: 0.6; cursor: not-allowed; position: relative;">
+      <div style="position: absolute; top: 10px; right: 10px; background: #ff5459; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+        🔒 Login Required
+      </div>
+      <h2>⚡ OPTIMIZER</h2>
+      <p>Get performance improvements and code optimization tips.</p>
+    </div>
+
+    <div class="lang-card" style="opacity: 0.6; cursor: not-allowed; position: relative;">
+      <div style="position: absolute; top: 10px; right: 10px; background: #ff5459; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+        🔒 Login Required
+      </div>
+      <h2>🎓 PRACTICE</h2>
+      <p>Solve 12 LeetCode-style problems to sharpen your skills.</p>
+    </div>
+    {% endif %}
   </section>
 
   <!-- DETAILS SECTION -->

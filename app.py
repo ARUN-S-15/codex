@@ -74,8 +74,17 @@ def is_admin():
     return user and user[0]
 
 # ---------------- AUTHENTICATION ----------------
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
+def index():
+    """Landing page - Main page accessible to everyone"""
+    return redirect(url_for("main"))
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
+    # If already logged in, redirect to main
+    if check_user():
+        return redirect(url_for("main"))
+    
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -142,7 +151,7 @@ def register():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(url_for("main"))
 
 # ---------------- EMAIL VERIFICATION ----------------
 @app.route("/verify-email/<token>")
@@ -588,13 +597,14 @@ def check_user():
 
 @app.route("/main")
 def main():
-    if not check_user():
-        return redirect(url_for("login"))
-    return render_template("main.html")
+    """Main landing page - accessible without login"""
+    user_logged_in = check_user()
+    username = session.get('username', None) if user_logged_in else None
+    return render_template("main.html", user_logged_in=user_logged_in, username=username)
 
 @app.route("/compiler")
 def compiler():
-    # Allow access to compiler without login, but pass user info
+    """Compiler page - accessible without login"""
     user_logged_in = check_user()
     username = session.get('username', None) if user_logged_in else None
     return render_template("compiler.html", user_logged_in=user_logged_in, username=username)
@@ -1199,6 +1209,10 @@ def simple_python_optimizer(code: str) -> str:
 
 @app.route("/optimize", methods=["POST"])
 def optimize_code():
+    """Optimize code - requires login"""
+    if not check_user():
+        return jsonify({"error": "Please login to use the optimizer feature"}), 401
+    
     data = request.get_json() or {}
     code = data.get("code", "")
     language = data.get("language", "python").lower()
@@ -3096,7 +3110,10 @@ def extract_key_concepts(code, language):
 
 @app.route('/explain_html', methods=['POST'])
 def explain_html():
-    """Generate comprehensive code explanations with beautiful colored boxes like AI assistants"""
+    """Generate comprehensive code explanations - requires login"""
+    if not check_user():
+        return jsonify({"html": "<div style='color:#ff5459; padding: 1rem; background: rgba(255,84,89,0.1); border-radius: 8px;'>⚠️ Please login to use the AI Explain feature. <a href='/login' style='color: #00d9ff; text-decoration: underline;'>Login here</a></div>"}), 401
+    
     print("\n" + "="*60)
     print("🎨 EXPLAIN_HTML ROUTE CALLED")
     print("="*60)
@@ -4060,6 +4077,15 @@ def auto_fix_c_cpp(code, issues):
 
 @app.route("/debug", methods=["POST"])
 def debug_code():
+    """Debug code - requires login"""
+    if not check_user():
+        return jsonify({
+            "issues": "⚠️ Please login to use the debugger feature.",
+            "fixed_code": "",
+            "original_code": "",
+            "login_required": True
+        }), 401
+    
     data = request.json
     code = data.get("code", "")
     language = data.get("language", "python").lower().strip()
