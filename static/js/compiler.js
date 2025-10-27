@@ -954,14 +954,18 @@ document.addEventListener("DOMContentLoaded", () => {
     
     explainBtn.addEventListener("click", async () => {
       console.log("Explain button clicked!");
+      console.log("window.USER_LOGGED_IN =", window.USER_LOGGED_IN);
+      console.log("typeof window.USER_LOGGED_IN =", typeof window.USER_LOGGED_IN);
       
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
+        console.log("User not logged in, redirecting...");
         alert("⚠️ Please login to use the AI Explain feature.\n\nThis is a premium feature available to registered users.");
         window.location.href = "/login";
         return;
       }
       
+      console.log("User is logged in, proceeding with explain...");
       const code = codeEditor.value.trim();
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || languageSelect.value;
       const languageValue = (languageText || "").toLowerCase();

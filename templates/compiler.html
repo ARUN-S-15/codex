@@ -1608,6 +1608,6 @@
   </main>
 
   <!-- ✅ Better: move JS into a separate file -->
-  <script src="{{ url_for('static', filename='js/compiler.js') }}?v=6"></script>
+  <script src="{{ url_for('static', filename='js/compiler.js') }}?v={{ range(1, 999999) | random }}"></script>
 </body>
 </html>
