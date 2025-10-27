@@ -80,17 +80,17 @@ Add these **REQUIRED** variables:
 ```env
 # Flask Configuration
 FLASK_ENV=production
-SECRET_KEY=a7f9d8e6c4b2a1f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1
+SECRET_KEY=your-secret-key-here
 
 # Database (we'll add MySQL next)
 DB_TYPE=mysql
 
-# Google Gemini AI (already have)
-GEMINI_API_KEY=AIzaSyB1sXQQb23SDvakAAm9RYflw0d9wlVYSqU
+# Google Gemini AI
+GEMINI_API_KEY=your-gemini-api-key-here
 
-# Google OAuth (already configured)
-GOOGLE_CLIENT_ID=698286024055-pjdn05lr364hfcsbipq17o9uldfioie8.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
+# Google OAuth (use your credentials from .env file)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 # Judge0 (optional - add if you have RapidAPI key)
 JUDGE0_API_KEY=your-judge0-key-if-you-have
