@@ -1295,28 +1295,30 @@ select.form-control {
 /* ==================== TOAST NOTIFICATIONS ==================== */
 .toast-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
+  width: 90%;
+  max-width: 450px;
 }
 
 .toast {
   background: white;
   color: #2d3748;
-  padding: 16px 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  min-width: 300px;
-  max-width: 500px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   opacity: 0;
-  transform: translateX(100%);
+  transform: scale(0.8);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: all;
   cursor: pointer;
@@ -1326,12 +1328,12 @@ select.form-control {
 
 .toast.show {
   opacity: 1;
-  transform: translateX(0);
+  transform: scale(1);
 }
 
 .toast.hide {
   opacity: 0;
-  transform: translateX(100%);
+  transform: scale(0.8);
 }
 
 .toast-icon {
@@ -1346,15 +1348,16 @@ select.form-control {
 
 .toast-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   margin-bottom: 4px;
 }
 
 .toast-message {
-  font-size: 13px;
-  opacity: 0.9;
-  line-height: 1.4;
+  font-size: 14px;
+  opacity: 0.95;
+  line-height: 1.5;
   word-wrap: break-word;
+  text-align: center;
 }
 
 .toast-close {
@@ -1421,13 +1424,15 @@ select.form-control {
 /* Mobile responsive */
 @media (max-width: 768px) {
   .toast-container {
-    top: 10px;
-    right: 10px;
-    left: 10px;
+    width: 95%;
+    max-width: 350px;
   }
   
   .toast {
-    min-width: unset;
-    max-width: unset;
+    padding: 18px 20px;
+  }
+  
+  .toast-icon {
+    font-size: 22px;
   }
 }
