@@ -1574,4 +1574,90 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
+  // ==================== KEYBOARD SHORTCUTS ====================
+  console.log("⌨️ Setting up keyboard shortcuts...");
+  
+  // Keyboard shortcuts handler
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Enter or Cmd+Enter: Run code
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      console.log("⌨️ Keyboard shortcut: Run code (Ctrl+Enter)");
+      if (runBtn && !runBtn.disabled) {
+        runBtn.click();
+      }
+      return;
+    }
+
+    // Ctrl+S or Cmd+S: Save code
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      console.log("⌨️ Keyboard shortcut: Save code (Ctrl+S)");
+      if (saveBtn && !saveBtn.disabled) {
+        saveBtn.click();
+      }
+      return;
+    }
+
+    // Ctrl+Shift+E or Cmd+Shift+E: Explain code
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
+      e.preventDefault();
+      console.log("⌨️ Keyboard shortcut: Explain code (Ctrl+Shift+E)");
+      if (explainBtn && !explainBtn.disabled) {
+        explainBtn.click();
+      }
+      return;
+    }
+
+    // Ctrl+Shift+D or Cmd+Shift+D: Debug code
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+      e.preventDefault();
+      console.log("⌨️ Keyboard shortcut: Debug code (Ctrl+Shift+D)");
+      if (debugBtn && !debugBtn.disabled) {
+        debugBtn.click();
+      }
+      return;
+    }
+
+    // Ctrl+Shift+O or Cmd+Shift+O: Optimize code
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'O') {
+      e.preventDefault();
+      console.log("⌨️ Keyboard shortcut: Optimize code (Ctrl+Shift+O)");
+      if (optimizeBtn && !optimizeBtn.disabled) {
+        optimizeBtn.click();
+      }
+      return;
+    }
+
+    // Ctrl+/ or Cmd+/: Show shortcuts help
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      showShortcutsHelp();
+      return;
+    }
+  });
+
+  // Function to show keyboard shortcuts help (make it global)
+  window.showShortcutsHelp = function() {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modifier = isMac ? 'Cmd' : 'Ctrl';
+    
+    const helpMessage = `
+⌨️ KEYBOARD SHORTCUTS:
+
+${modifier} + Enter     - Run code
+${modifier} + S         - Save code
+${modifier} + Shift + E - Explain code (AI)
+${modifier} + Shift + D - Debug code (AI)
+${modifier} + Shift + O - Optimize code (AI)
+${modifier} + /         - Show this help
+
+💡 Tip: These shortcuts work anywhere on the page!
+    `.trim();
+    
+    alert(helpMessage);
+  };
+
+  console.log("✅ Keyboard shortcuts enabled! Press Ctrl+/ for help");
 });
