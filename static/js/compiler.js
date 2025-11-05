@@ -1,97 +1,5 @@
-// ==================== TOAST NOTIFICATION SYSTEM ====================
-const Toast = {
-  container: null,
-  
-  init() {
-    this.container = document.getElementById('toastContainer');
-    if (!this.container) {
-      this.container = document.createElement('div');
-      this.container.id = 'toastContainer';
-      this.container.className = 'toast-container';
-      document.body.appendChild(this.container);
-    }
-  },
-  
-  show(message, type = 'info', duration = 3000) {
-    if (!this.container) this.init();
-    
-    const icons = {
-      success: '✅',
-      error: '❌',
-      warning: '⚠️',
-      info: 'ℹ️'
-    };
-    
-    const titles = {
-      success: 'Success',
-      error: 'Error',
-      warning: 'Warning',
-      info: 'Info'
-    };
-    
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-      <div class="toast-icon">${icons[type] || icons.info}</div>
-      <div class="toast-content">
-        <div class="toast-title">${titles[type] || titles.info}</div>
-        <div class="toast-message">${message}</div>
-      </div>
-      <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-      <div class="toast-progress"></div>
-    `;
-    
-    this.container.appendChild(toast);
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-      toast.classList.add('show');
-    });
-    
-    // Auto remove
-    setTimeout(() => {
-      toast.classList.add('hide');
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
-    
-    // Click to dismiss
-    toast.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('toast-close')) {
-        toast.classList.add('hide');
-        setTimeout(() => toast.remove(), 300);
-      }
-    });
-    
-    return toast;
-  },
-  
-  success(message, duration) {
-    return this.show(message, 'success', duration);
-  },
-  
-  error(message, duration) {
-    return this.show(message, 'error', duration);
-  },
-  
-  warning(message, duration) {
-    return this.show(message, 'warning', duration);
-  },
-  
-  info(message, duration) {
-    return this.show(message, 'info', duration);
-  }
-};
-
-// Make Toast available globally
-window.Toast = Toast;
-console.log("✅ Toast notification system loaded!");
-
-// ==================== MAIN APP ====================
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Compiler.js loaded successfully!");
-  
-  // Initialize toast system
-  Toast.init();
   
   // ============================================
   // CODEMIRROR INITIALIZATION (Single Unified Editor)
@@ -393,8 +301,8 @@ document.addEventListener("DOMContentLoaded", () => {
     saveBtn.addEventListener('click', async () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        Toast.warning("Please login to save your code. Create a free account to save and manage your projects.");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        alert("⚠️ Please login to save your code.\n\nCreate a free account to save and manage your projects.");
+        window.location.href = "/login";
         return;
       }
       
@@ -402,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text;
       
       if (!code) {
-        Toast.warning("Please write some code before saving!");
+        alert("⚠️ Please write some code before saving!");
         return;
       }
       
@@ -427,12 +335,12 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const data = await response.json();
         if (data.success) {
-          Toast.success(data.message + " - View your saved projects in 📁 My Code");
+          alert("✅ " + data.message + "\n\nView your saved projects in 📁 My Code");
         } else {
-          Toast.error(data.error || "Failed to save");
+          alert("❌ " + (data.error || "Failed to save"));
         }
       } catch (err) {
-        Toast.error("Error: " + err.message);
+        alert("❌ Error: " + err.message);
       }
     });
   }
@@ -441,8 +349,8 @@ document.addEventListener("DOMContentLoaded", () => {
     shareBtn.addEventListener('click', async () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        Toast.warning("Please login to share your code. Create a free account to share your projects with others.");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        alert("⚠️ Please login to share your code.\n\nCreate a free account to share your projects with others.");
+        window.location.href = "/login";
         return;
       }
       
@@ -450,7 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text;
       
       if (!code) {
-        Toast.warning("Please write some code before sharing!");
+        alert("⚠️ Please write some code before sharing!");
         return;
       }
       
@@ -477,12 +385,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.success) {
           // Copy link to clipboard
           navigator.clipboard.writeText(data.share_link);
-          Toast.success(data.message + " - Link copied to clipboard!");
+          alert("✅ " + data.message + "\n\nLink copied to clipboard:\n" + data.share_link);
         } else {
-          Toast.error(data.error || "Failed to create share link");
+          alert("❌ " + (data.error || "Failed to create share link"));
         }
       } catch (err) {
-        Toast.error("Error: " + err.message);
+        alert("❌ Error: " + err.message);
       }
     });
   }
@@ -1052,8 +960,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
         console.log("User not logged in, redirecting...");
-        Toast.warning("Please login to use the AI Explain feature. This is a premium feature available to registered users.");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        alert("⚠️ Please login to use the AI Explain feature.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
         return;
       }
       
@@ -1156,8 +1064,8 @@ document.addEventListener("DOMContentLoaded", () => {
     debugBtn.addEventListener("click", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        Toast.warning("Please login to use the AI Debugger feature. This is a premium feature available to registered users.");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        alert("⚠️ Please login to use the AI Debugger feature.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
         return;
       }
       
@@ -1165,7 +1073,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
       
       if (!code) {
-        Toast.warning("Please write some code before debugging!");
+        alert("⚠️ Please write some code before debugging!");
         return;
       }
 
@@ -1196,8 +1104,8 @@ document.addEventListener("DOMContentLoaded", () => {
     optimizeBtn.addEventListener("click", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        Toast.warning("Please login to use the AI Optimizer feature. This is a premium feature available to registered users.");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        alert("⚠️ Please login to use the AI Optimizer feature.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
         return;
       }
       
@@ -1205,7 +1113,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
       
       if (!code) {
-        Toast.warning("Please write some code before optimizing!");
+        alert("⚠️ Please write some code before optimizing!");
         return;
       }
 
@@ -1277,7 +1185,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const code = codeEditor.value;
       
       if (!code) {
-        Toast.warning("No code to copy!");
+        alert("⚠️ No code to copy!");
         return;
       }
 
@@ -1287,14 +1195,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const originalText = copyCodeBtn.textContent;
         copyCodeBtn.textContent = "✓ Copied!";
         copyCodeBtn.style.background = "#10b981";
-        Toast.success("Code copied to clipboard!");
         
         setTimeout(() => {
           copyCodeBtn.textContent = originalText;
           copyCodeBtn.style.background = "";
         }, 2000);
       }).catch(err => {
-        Toast.error("Failed to copy: " + err);
+        alert("Failed to copy: " + err);
       });
     });
   }
@@ -1306,15 +1213,15 @@ document.addEventListener("DOMContentLoaded", () => {
     downloadCodeBtn.addEventListener("click", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        Toast.warning("Please login to download your code. Create a free account to download and save your projects.");
-        setTimeout(() => { window.location.href = "/login"; }, 1500);
+        alert("⚠️ Please login to download your code.\n\nCreate a free account to download and save your projects.");
+        window.location.href = "/login";
         return;
       }
       
       const code = codeEditor.value;
       
       if (!code) {
-        Toast.warning("No code to download!");
+        alert("⚠️ No code to download!");
         return;
       }
 
@@ -1343,9 +1250,6 @@ document.addEventListener("DOMContentLoaded", () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
-      // Success notification
-      Toast.success("Code downloaded as " + filename);
       
       // Visual feedback
       const originalText = downloadCodeBtn.textContent;

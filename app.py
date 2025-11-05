@@ -662,19 +662,6 @@ def optimizer():
         return redirect(url_for("login"))
     return render_template("optimizer.html")
 
-@app.route("/practice")
-def practice():
-    if not check_user():
-        return redirect(url_for("login"))
-    return render_template("practice.html")
-
-@app.route("/problem")
-def problem():
-    if not check_user():
-        return redirect(url_for("login"))
-    return render_template("problem.html")
-
-
 def is_valid_code(code):
     """
     Check if the input is actual code, not just plain text.

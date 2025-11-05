@@ -20,7 +20,6 @@
       <li><a href="{{ url_for('main') }}">Home</a></li>
       <li><a href="{{ url_for('compiler') }}">Compiler</a></li>
       {% if user_logged_in %}
-        <li><a href="{{ url_for('practice') }}">Practice</a></li>
         <li><a href="{{ url_for('my_projects') }}">My Projects</a></li>
         <li><a href="{{ url_for('profile') }}">Profile</a></li>
         <li><a href="{{ url_for('logout') }}" style="background: #ff5459; padding: 8px 16px; border-radius: 5px;">Logout</a></li>
@@ -39,7 +38,7 @@
       </p>
     {% else %}
       <p style="font-size: 1rem; margin-top: 10px; opacity: 0.9;">
-        Compile • Debug • Optimize • Practice • Learn
+        Compile • Debug • Optimize • Learn
       </p>
     {% endif %}
 
@@ -54,10 +53,6 @@
 
     <!-- Quick Stats -->
     <div style="margin-top: 30px; display: flex; gap: 30px; justify-content: center; flex-wrap: wrap;">
-      <div style="text-align: center;">
-        <div style="font-size: 2rem; font-weight: 700; color: #00d9ff;">12</div>
-        <div style="font-size: 0.9rem; opacity: 0.8;">Practice Problems</div>
-      </div>
       <div style="text-align: center;">
         <div style="font-size: 2rem; font-weight: 700; color: #00d9ff;">5</div>
         <div style="font-size: 0.9rem; opacity: 0.8;">Languages</div>
@@ -90,11 +85,6 @@
       <h2>⚡ OPTIMIZER</h2>
       <p>Get performance improvements and code optimization tips.</p>
     </a>
-
-    <a href="{{ url_for('practice') }}" class="lang-card">
-      <h2>🎓 PRACTICE</h2>
-      <p>Solve 12 LeetCode-style problems to sharpen your skills.</p>
-    </a>
     {% else %}
     <div class="lang-card" style="opacity: 0.6; cursor: not-allowed; position: relative;">
       <div style="position: absolute; top: 10px; right: 10px; background: #ff5459; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
@@ -112,13 +102,7 @@
       <p>Get performance improvements and code optimization tips.</p>
     </div>
 
-    <div class="lang-card" style="opacity: 0.6; cursor: not-allowed; position: relative;">
-      <div style="position: absolute; top: 10px; right: 10px; background: #ff5459; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
-        🔒 Login Required
-      </div>
-      <h2>🎓 PRACTICE</h2>
-      <p>Solve 12 LeetCode-style problems to sharpen your skills.</p>
-    </div>
+
     {% endif %}
   </section>
 
@@ -126,18 +110,18 @@
   <section class="details">
     <h2>About CODEX</h2>
     <p>
-      CODEX is your AI-powered companion for programming. Whether you're stuck with an error, want to optimize code, or need a line-by-line explanation, CODEX is here to help. With 12 practice problems, multi-language compiler, and Google Gemini AI integration, CODEX makes coding easier and more enjoyable!
+      CODEX is your AI-powered companion for programming. Whether you're stuck with an error, want to optimize code, or need a line-by-line explanation, CODEX is here to help. With multi-language compiler and Google Gemini AI integration, CODEX makes coding easier and more enjoyable!
     </p>
     
     <div style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
       <h3 style="margin-bottom: 15px;">✨ Key Features</h3>
       <ul style="list-style: none; padding: 0;">
         <li style="padding: 8px 0;">✅ <strong>Multi-Language Compiler:</strong> Python, C, C++, Java, JavaScript</li>
-        <li style="padding: 8px 0;">✅ <strong>12 Practice Problems:</strong> Easy, Medium, and Hard challenges</li>
         <li style="padding: 8px 0;">✅ <strong>AI Code Assistant:</strong> Powered by Google Gemini 2.0 Flash</li>
         <li style="padding: 8px 0;">✅ <strong>Project Management:</strong> Save, share, and manage your code</li>
         <li style="padding: 8px 0;">✅ <strong>Smart Debugger:</strong> Find and fix bugs automatically</li>
         <li style="padding: 8px 0;">✅ <strong>Code Optimizer:</strong> Improve performance and readability</li>
+        <li style="padding: 8px 0;">✅ <strong>Keyboard Shortcuts:</strong> Boost productivity with quick commands</li>
       </ul>
     </div>
   </section>
@@ -147,7 +131,6 @@
     <p>&copy; 2025 CODEX. All rights reserved. | 
       <a href="{{ url_for('main') }}">Dashboard</a> | 
       <a href="{{ url_for('compiler') }}">Compiler</a> | 
-      <a href="{{ url_for('practice') }}">Practice</a> | 
       <a href="{{ url_for('my_projects') }}">My Projects</a>
     </p>
     <p style="margin-top: 10px; font-size: 0.85rem; opacity: 0.7;">
