@@ -1894,9 +1894,9 @@ ${modifier} + /         - Show this help
       <div style="padding: 2rem;">
         <!-- Controls -->
         <div style="display: flex; gap: 1rem; margin-bottom: 2rem; align-items: center; justify-content: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-          <button onclick="stepBackward()" ${currentStep === 0 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">⏮ Previous</button>
+          <button id="vizPrevBtn" ${currentStep === 0 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">⏮ Previous</button>
           <div style="color: #ececf1; font-weight: bold;">Step ${currentStep + 1} of ${totalSteps}</div>
-          <button onclick="stepForward()" ${currentStep === totalSteps - 1 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">Next ⏭</button>
+          <button id="vizNextBtn" ${currentStep === totalSteps - 1 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">Next ⏭</button>
         </div>
 
         <!-- Current Line -->
@@ -1975,9 +1975,31 @@ ${modifier} + /         - Show this help
     `;
 
     visualizationBox.innerHTML = html;
+    
+    // Attach event listeners to the new buttons
+    const vizPrevBtn = document.getElementById('vizPrevBtn');
+    const vizNextBtn = document.getElementById('vizNextBtn');
+    
+    if (vizPrevBtn) {
+      vizPrevBtn.addEventListener('click', () => {
+        if (currentStep > 0) {
+          currentStep--;
+          displayVisualization();
+        }
+      });
+    }
+    
+    if (vizNextBtn) {
+      vizNextBtn.addEventListener('click', () => {
+        if (visualizationData && currentStep < visualizationData.steps.length - 1) {
+          currentStep++;
+          displayVisualization();
+        }
+      });
+    }
   }
 
-  // Global functions for step controls
+  // Also keep global functions for backward compatibility
   window.stepForward = function() {
     if (visualizationData && currentStep < visualizationData.steps.length - 1) {
       currentStep++;
