@@ -1660,4 +1660,335 @@ ${modifier} + /         - Show this help
   };
 
   console.log("✅ Keyboard shortcuts enabled! Press Ctrl+/ for help");
+
+  // ---- CODE QUALITY SCORE ----
+  const qualityBtn = document.getElementById("qualityBtn");
+  const qualitySection = document.getElementById("qualitySection");
+  const qualityBox = document.getElementById("qualityBox");
+  const closeQualityBtn = document.getElementById("closeQualityBtn");
+
+  if (qualityBtn) {
+    qualityBtn.addEventListener("click", async () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to use the Code Quality Analyzer.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
+        return;
+      }
+
+      const code = codeEditor.value.trim();
+      if (!code) {
+        alert("⚠️ Please write some code before analyzing quality!");
+        return;
+      }
+
+      const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
+
+      // Show loading
+      qualitySection.classList.remove("hidden");
+      qualityBox.innerHTML = '<div class="loading-spinner">🔄 Analyzing code quality...</div>';
+      
+      // Disable button
+      qualityBtn.disabled = true;
+      const originalText = qualityBtn.innerHTML;
+      qualityBtn.innerHTML = "⏳ Analyzing...";
+
+      try {
+        const response = await fetch("/api/code-quality", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, language: languageText })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Quality analysis failed");
+        }
+
+        const data = await response.json();
+        displayQualityScore(data);
+      } catch (error) {
+        console.error("Quality analysis error:", error);
+        qualityBox.innerHTML = `<div class="error-message">❌ ${error.message}</div>`;
+      } finally {
+        qualityBtn.disabled = false;
+        qualityBtn.innerHTML = originalText;
+      }
+    });
+  }
+
+  if (closeQualityBtn) {
+    closeQualityBtn.addEventListener("click", () => {
+      qualitySection.classList.add("hidden");
+    });
+  }
+
+  function displayQualityScore(data) {
+    const gradeColors = {
+      'A+': '#10a37f', 'A': '#10a37f',
+      'B+': '#52c41a', 'B': '#52c41a',
+      'C+': '#faad14', 'C': '#faad14',
+      'D': '#ff7a45', 'F': '#ff4d4f'
+    };
+
+    const gradeColor = gradeColors[data.grade] || '#666';
+
+    let html = `
+      <div style="padding: 2rem;">
+        <!-- Overall Score -->
+        <div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, ${gradeColor}22, ${gradeColor}11); border-radius: 12px; border: 2px solid ${gradeColor};">
+          <div style="font-size: 4rem; font-weight: bold; color: ${gradeColor}; margin-bottom: 0.5rem;">${data.overall_score}/100</div>
+          <div style="font-size: 2rem; font-weight: bold; color: ${gradeColor}; margin-bottom: 0.5rem;">Grade: ${data.grade}</div>
+          <div style="color: #ececf1; opacity: 0.8;">${data.summary}</div>
+        </div>
+
+        <!-- Detailed Scores -->
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #ececf1; margin-bottom: 1rem;">📊 Detailed Scores</h3>
+          ${Object.entries(data.scores).map(([key, value]) => `
+            <div style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="color: #ececf1; text-transform: capitalize;">${key.replace('_', ' ')}</span>
+                <span style="color: ${value >= 80 ? '#10a37f' : value >= 60 ? '#faad14' : '#ff4d4f'}; font-weight: bold;">${value}/100</span>
+              </div>
+              <div style="height: 8px; background: #2a2b32; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; background: linear-gradient(90deg, ${value >= 80 ? '#10a37f' : value >= 60 ? '#faad14' : '#ff4d4f'}, ${value >= 80 ? '#52c41a' : value >= 60 ? '#ff7a45' : '#ff7875'}); width: ${value}%; transition: width 0.3s;"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Strengths -->
+        ${data.strengths && data.strengths.length > 0 ? `
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #10a37f; margin-bottom: 1rem;">✅ Strengths</h3>
+          <ul style="list-style: none; padding: 0;">
+            ${data.strengths.map(s => `<li style="padding: 0.5rem 0; color: #ececf1;">• ${s}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        <!-- Issues -->
+        ${data.issues && data.issues.length > 0 ? `
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #ff4d4f; margin-bottom: 1rem;">⚠️ Issues Found</h3>
+          ${data.issues.map(issue => {
+            const severityColors = {critical: '#ff4d4f', high: '#ff7a45', medium: '#faad14', low: '#1890ff'};
+            const severityColor = severityColors[issue.severity] || '#666';
+            return `
+              <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-left: 4px solid ${severityColor}; border-radius: 4px;">
+                <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem;">
+                  <span style="background: ${severityColor}; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; text-transform: uppercase; font-weight: bold;">${issue.severity}</span>
+                  <span style="background: #2a2b32; color: #ececf1; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;">${issue.category}</span>
+                  ${issue.line ? `<span style="color: #666;">Line ${issue.line}</span>` : ''}
+                </div>
+                <div style="color: #ececf1; font-weight: bold; margin-bottom: 0.5rem;">${issue.title}</div>
+                <div style="color: #ececf1; opacity: 0.8; margin-bottom: 0.5rem;">${issue.description}</div>
+                <div style="color: #10a37f; font-style: italic;">💡 ${issue.suggestion}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Complexity -->
+        ${data.complexity ? `
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #ececf1; margin-bottom: 1rem;">🧠 Complexity Analysis</h3>
+          <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+            <div style="color: #ececf1; margin-bottom: 0.5rem;"><strong>Cyclomatic Complexity:</strong> ${data.complexity.cyclomatic}</div>
+            <div style="color: #ececf1; margin-bottom: 0.5rem;"><strong>Cognitive Load:</strong> ${data.complexity.cognitive}</div>
+            <div style="color: #ececf1; opacity: 0.8;">${data.complexity.description}</div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Recommendations -->
+        ${data.recommendations && data.recommendations.length > 0 ? `
+        <div>
+          <h3 style="color: #1890ff; margin-bottom: 1rem;">💡 Recommendations</h3>
+          <ul style="list-style: none; padding: 0;">
+            ${data.recommendations.map(r => `<li style="padding: 0.5rem 0; color: #ececf1;">• ${r}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    qualityBox.innerHTML = html;
+  }
+
+  // ---- CODE VISUALIZATION ----
+  const visualizeBtn = document.getElementById("visualizeBtn");
+  const visualizationSection = document.getElementById("visualizationSection");
+  const visualizationBox = document.getElementById("visualizationBox");
+  const closeVisualizationBtn = document.getElementById("closeVisualizationBtn");
+
+  let currentStep = 0;
+  let visualizationData = null;
+
+  if (visualizeBtn) {
+    visualizeBtn.addEventListener("click", async () => {
+      // Check if user is logged in
+      if (!window.USER_LOGGED_IN) {
+        alert("⚠️ Please login to use the Code Visualizer.\n\nThis is a premium feature available to registered users.");
+        window.location.href = "/login";
+        return;
+      }
+
+      const code = codeEditor.value.trim();
+      if (!code) {
+        alert("⚠️ Please write some code before visualizing!");
+        return;
+      }
+
+      const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
+
+      // Show loading
+      visualizationSection.classList.remove("hidden");
+      visualizationBox.innerHTML = '<div class="loading-spinner">🔄 Generating execution trace...</div>';
+      
+      // Disable button
+      visualizeBtn.disabled = true;
+      const originalText = visualizeBtn.innerHTML;
+      visualizeBtn.innerHTML = "⏳ Visualizing...";
+
+      try {
+        const response = await fetch("/api/visualize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, language: languageText })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Visualization failed");
+        }
+
+        visualizationData = await response.json();
+        currentStep = 0;
+        displayVisualization();
+      } catch (error) {
+        console.error("Visualization error:", error);
+        visualizationBox.innerHTML = `<div class="error-message">❌ ${error.message}</div>`;
+      } finally {
+        visualizeBtn.disabled = false;
+        visualizeBtn.innerHTML = originalText;
+      }
+    });
+  }
+
+  if (closeVisualizationBtn) {
+    closeVisualizationBtn.addEventListener("click", () => {
+      visualizationSection.classList.add("hidden");
+    });
+  }
+
+  function displayVisualization() {
+    if (!visualizationData || !visualizationData.steps) return;
+
+    const step = visualizationData.steps[currentStep];
+    const totalSteps = visualizationData.steps.length;
+
+    let html = `
+      <div style="padding: 2rem;">
+        <!-- Controls -->
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; align-items: center; justify-content: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+          <button onclick="stepBackward()" ${currentStep === 0 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">⏮ Previous</button>
+          <div style="color: #ececf1; font-weight: bold;">Step ${currentStep + 1} of ${totalSteps}</div>
+          <button onclick="stepForward()" ${currentStep === totalSteps - 1 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">Next ⏭</button>
+        </div>
+
+        <!-- Current Line -->
+        <div style="margin-bottom: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #10a37f22, #10a37f11); border-left: 4px solid #10a37f; border-radius: 8px;">
+          <div style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">Line ${step.line}</div>
+          <div style="font-family: 'Consolas', 'Monaco', monospace; color: #ececf1; font-size: 1.1rem; margin-bottom: 0.5rem;"><code>${escapeHtml(step.code)}</code></div>
+          <div style="color: #10a37f; font-weight: bold;">→ ${step.action}</div>
+        </div>
+
+        <!-- Variables -->
+        ${Object.keys(step.variables || {}).length > 0 ? `
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #ececf1; margin-bottom: 1rem;">📦 Variables</h3>
+          <div style="display: grid; gap: 1rem;">
+            ${Object.entries(step.variables).map(([name, info]) => `
+              <div style="padding: 1rem; background: ${info.changed ? 'rgba(16, 163, 127, 0.1)' : 'rgba(255,255,255,0.05)'}; border-radius: 8px; border-left: 3px solid ${info.changed ? '#10a37f' : '#666'};">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: #1890ff; font-weight: bold; font-family: monospace;">${name}</span>
+                  <span style="color: #666; font-size: 0.85rem;">${info.type}</span>
+                </div>
+                <div style="color: #ececf1; font-family: monospace;">${typeof info.value === 'object' ? JSON.stringify(info.value) : info.value}</div>
+                ${info.changed ? '<div style="color: #10a37f; font-size: 0.85rem; margin-top: 0.5rem;">✓ Changed</div>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Call Stack -->
+        ${step.call_stack && step.call_stack.length > 0 ? `
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #ececf1; margin-bottom: 1rem;">📚 Call Stack</h3>
+          <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+            ${step.call_stack.map((func, idx) => `
+              <div style="padding: 0.5rem; color: ${idx === step.call_stack.length - 1 ? '#10a37f' : '#ececf1'}; font-family: monospace;">
+                ${'→ '.repeat(idx + 1)} ${func}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Output -->
+        ${step.output ? `
+        <div style="margin-bottom: 2rem;">
+          <h3 style="color: #ececf1; margin-bottom: 1rem;">📟 Output</h3>
+          <div style="padding: 1rem; background: #1a1b26; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; color: #10a37f;">
+            ${escapeHtml(step.output)}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Memory -->
+        ${step.memory && step.memory.allocated ? `
+        <div>
+          <h3 style="color: #ececf1; margin-bottom: 1rem;">💾 Memory</h3>
+          <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; color: #ececf1;">
+            ${step.memory.allocated}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Summary (show on last step) -->
+        ${currentStep === totalSteps - 1 && visualizationData.summary ? `
+        <div style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #1890ff22, #1890ff11); border-radius: 8px;">
+          <h3 style="color: #1890ff; margin-bottom: 1rem;">🎯 Execution Summary</h3>
+          <div style="color: #ececf1;">
+            <p>Total Steps: ${visualizationData.summary.total_steps}</p>
+            <p>Variables Created: ${visualizationData.summary.variables_created.join(', ')}</p>
+            ${visualizationData.summary.functions_called.length > 0 ? `<p>Functions Called: ${visualizationData.summary.functions_called.join(', ')}</p>` : ''}
+            <p style="margin-top: 1rem; opacity: 0.8;">${visualizationData.summary.complexity}</p>
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    visualizationBox.innerHTML = html;
+  }
+
+  // Global functions for step controls
+  window.stepForward = function() {
+    if (visualizationData && currentStep < visualizationData.steps.length - 1) {
+      currentStep++;
+      displayVisualization();
+    }
+  };
+
+  window.stepBackward = function() {
+    if (currentStep > 0) {
+      currentStep--;
+      displayVisualization();
+    }
+  };
 });

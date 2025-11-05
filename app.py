@@ -1251,6 +1251,216 @@ def optimize_code():
         return jsonify({"error": "Optimization failed", "detail": str(e)}), 500
 
 
+# ---------------- AI CODE QUALITY SCORE ----------------
+
+@app.route("/api/code-quality", methods=["POST"])
+def analyze_code_quality():
+    """Analyze code quality and provide comprehensive scoring - requires login"""
+    if not check_user():
+        return jsonify({"error": "Please login to use the code quality analyzer"}), 401
+    
+    data = request.get_json() or {}
+    code = data.get("code", "")
+    language = data.get("language", "python").lower()
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    if not gemini_model:
+        return jsonify({"error": "AI service unavailable"}), 503
+
+    try:
+        # Create comprehensive prompt for Gemini
+        prompt = f"""You are an expert code reviewer and senior software engineer. Analyze this {language.upper()} code and provide a comprehensive quality assessment.
+
+CODE TO ANALYZE:
+```{language}
+{code}
+```
+
+Provide a detailed analysis in the following JSON format (respond ONLY with valid JSON, no markdown):
+
+{{
+    "overall_score": <0-100 integer>,
+    "grade": "<A+, A, B+, B, C+, C, D, F>",
+    "scores": {{
+        "code_quality": <0-100>,
+        "readability": <0-100>,
+        "maintainability": <0-100>,
+        "performance": <0-100>,
+        "security": <0-100>,
+        "best_practices": <0-100>
+    }},
+    "strengths": [
+        "Specific strength 1",
+        "Specific strength 2",
+        "Specific strength 3"
+    ],
+    "issues": [
+        {{
+            "severity": "critical|high|medium|low",
+            "category": "bug|security|performance|style|best-practice",
+            "title": "Issue title",
+            "description": "Detailed description",
+            "line": <line number or null>,
+            "suggestion": "How to fix it"
+        }}
+    ],
+    "complexity": {{
+        "cyclomatic": <integer>,
+        "cognitive": "low|medium|high",
+        "description": "Brief explanation"
+    }},
+    "recommendations": [
+        "Specific actionable recommendation 1",
+        "Specific actionable recommendation 2",
+        "Specific actionable recommendation 3"
+    ],
+    "summary": "One paragraph summary of the code quality"
+}}
+
+Be thorough, specific, and constructive. Focus on actionable feedback."""
+
+        response = gemini_model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Remove markdown code blocks if present
+        if response_text.startswith("```"):
+            response_text = re.sub(r'^```(?:json)?\s*\n', '', response_text)
+            response_text = re.sub(r'\n```\s*$', '', response_text)
+        
+        # Parse JSON response
+        quality_data = json.loads(response_text)
+        
+        # Save to history
+        if session.get('user_id'):
+            title = generate_code_title(code)
+            add_to_history(
+                user_id=session['user_id'],
+                activity_type='quality_check',
+                code_snippet=code,
+                language=language.capitalize(),
+                title=title,
+                output=f"Quality Score: {quality_data.get('overall_score', 0)}/100 (Grade: {quality_data.get('grade', 'N/A')})"
+            )
+        
+        return jsonify(quality_data)
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON Parse Error: {e}")
+        print(f"Response: {response_text[:500]}")
+        return jsonify({
+            "error": "Failed to parse AI response",
+            "detail": "The AI returned an invalid format"
+        }), 500
+    except Exception as e:
+        print(f"Quality Analysis Error: {e}")
+        return jsonify({
+            "error": "Quality analysis failed",
+            "detail": str(e)
+        }), 500
+
+
+# ---------------- CODE EXECUTION VISUALIZATION ----------------
+
+@app.route("/api/visualize", methods=["POST"])
+def visualize_execution():
+    """Generate step-by-step execution visualization - requires login"""
+    if not check_user():
+        return jsonify({"error": "Please login to use the code visualizer"}), 401
+    
+    data = request.get_json() or {}
+    code = data.get("code", "")
+    language = data.get("language", "python").lower()
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    if not gemini_model:
+        return jsonify({"error": "AI service unavailable"}), 503
+
+    try:
+        prompt = f"""You are a code execution visualizer. Analyze this {language.upper()} code and generate a step-by-step execution trace.
+
+CODE TO VISUALIZE:
+```{language}
+{code}
+```
+
+Generate a detailed execution trace in the following JSON format (respond ONLY with valid JSON):
+
+{{
+    "steps": [
+        {{
+            "step": 1,
+            "line": <line number>,
+            "code": "actual code line",
+            "action": "Brief description of what happens",
+            "variables": {{
+                "var_name": {{"value": "current value", "type": "int|str|list|etc", "changed": true|false}}
+            }},
+            "call_stack": ["function1", "function2"],
+            "output": "any print output at this step or null",
+            "memory": {{"allocated": "description of memory changes or null"}}
+        }}
+    ],
+    "summary": {{
+        "total_steps": <number>,
+        "variables_created": ["var1", "var2"],
+        "functions_called": ["func1", "func2"],
+        "complexity": "Brief complexity analysis",
+        "final_output": "Final program output"
+    }}
+}}
+
+Important:
+- Include ALL variable changes at each step
+- Show the exact value stored in each variable
+- Track when variables are created, modified, or destroyed
+- For loops, show each iteration
+- For function calls, show call stack changes
+- Be precise and educational"""
+
+        response = gemini_model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Remove markdown code blocks if present
+        if response_text.startswith("```"):
+            response_text = re.sub(r'^```(?:json)?\s*\n', '', response_text)
+            response_text = re.sub(r'\n```\s*$', '', response_text)
+        
+        # Parse JSON response
+        viz_data = json.loads(response_text)
+        
+        # Save to history
+        if session.get('user_id'):
+            title = generate_code_title(code)
+            add_to_history(
+                user_id=session['user_id'],
+                activity_type='visualize',
+                code_snippet=code,
+                language=language.capitalize(),
+                title=title,
+                output=f"Visualized {viz_data.get('summary', {}).get('total_steps', 0)} execution steps"
+            )
+        
+        return jsonify(viz_data)
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON Parse Error: {e}")
+        print(f"Response: {response_text[:500]}")
+        return jsonify({
+            "error": "Failed to parse AI response",
+            "detail": "The AI returned an invalid format"
+        }), 500
+    except Exception as e:
+        print(f"Visualization Error: {e}")
+        return jsonify({
+            "error": "Visualization failed",
+            "detail": str(e)
+        }), 500
+
+
 def analyze_code_purpose(code, language):
     """Analyze what the code does and provide comprehensive high-level overview"""
     overview = []

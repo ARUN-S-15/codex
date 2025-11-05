@@ -1558,6 +1558,8 @@
   <button id="explainBtn" class="btn btn--outline">💡 Explain Code</button>
   <button id="debugBtn" class="btn btn--outline">🪲 Debug</button>
   <button id="optimizeBtn" class="btn btn--outline">⚙️ Optimize</button>
+  <button id="qualityBtn" class="btn btn--outline">📊 Quality Score</button>
+  <button id="visualizeBtn" class="btn btn--outline">🎬 Visualize</button>
   <button id="shortcutsBtn" class="btn btn--text" onclick="showShortcutsHelp()" style="margin-left:auto; opacity:0.7;" title="Keyboard Shortcuts (Ctrl+/)">⌨️ Shortcuts</button>
 </div>
 
@@ -1599,6 +1601,42 @@
         <div class="explain-placeholder">
           <div class="explain-placeholder-icon">💡</div>
           <p>Click "Explain Code" to get AI-powered insights about your code</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CODE QUALITY SCORE SECTION -->
+    <div class="section hidden" id="qualitySection">
+      <div class="explain-header">
+        <div class="explain-icon">📊</div>
+        <div>
+          <h2 class="explain-title">Code Quality Analysis</h2>
+          <p class="explain-subtitle">Comprehensive code review by AI</p>
+        </div>
+        <button id="closeQualityBtn" class="close-explain-btn">✕</button>
+      </div>
+      <div id="qualityBox" class="modern-explanation-box">
+        <div class="explain-placeholder">
+          <div class="explain-placeholder-icon">📊</div>
+          <p>Click "Quality Score" to get a comprehensive code quality assessment</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CODE VISUALIZATION SECTION -->
+    <div class="section hidden" id="visualizationSection">
+      <div class="explain-header">
+        <div class="explain-icon">🎬</div>
+        <div>
+          <h2 class="explain-title">Code Execution Visualization</h2>
+          <p class="explain-subtitle">Step-by-step execution trace</p>
+        </div>
+        <button id="closeVisualizationBtn" class="close-explain-btn">✕</button>
+      </div>
+      <div id="visualizationBox" class="modern-explanation-box">
+        <div class="explain-placeholder">
+          <div class="explain-placeholder-icon">🎬</div>
+          <p>Click "Visualize" to see step-by-step execution with variable tracking</p>
         </div>
       </div>
     </div>
