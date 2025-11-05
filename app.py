@@ -1363,6 +1363,34 @@ Be thorough, specific, and constructive. Focus on actionable feedback."""
 
 # ---------------- CODE EXECUTION VISUALIZATION ----------------
 
+def create_simple_visualization(code, language):
+    """Fallback: Create a simple line-by-line visualization without AI"""
+    lines = [line for line in code.split('\n') if line.strip()]
+    steps = []
+    
+    for i, line in enumerate(lines, 1):
+        step = {
+            "step": i,
+            "line": i,
+            "code": line.strip(),
+            "action": f"Execute line {i}",
+            "variables": {},
+            "call_stack": [],
+            "output": None
+        }
+        steps.append(step)
+    
+    return {
+        "steps": steps,
+        "summary": {
+            "total_steps": len(steps),
+            "variables_created": [],
+            "functions_called": [],
+            "complexity": "Simple line-by-line trace (AI analysis unavailable)",
+            "final_output": "See code execution above"
+        }
+    }
+
 @app.route("/api/visualize", methods=["POST"])
 def visualize_execution():
     """Generate step-by-step execution visualization - requires login"""
@@ -1380,57 +1408,74 @@ def visualize_execution():
         return jsonify({"error": "AI service unavailable"}), 503
 
     try:
-        prompt = f"""You are a code execution visualizer. Analyze this {language.upper()} code and generate a step-by-step execution trace.
+        prompt = f"""You are a code execution trace generator. Analyze this {language.upper()} code and create a step-by-step execution visualization.
 
-CODE TO VISUALIZE:
-```{language}
+CODE:
 {code}
-```
 
-Generate a detailed execution trace in the following JSON format (respond ONLY with valid JSON):
+CRITICAL INSTRUCTIONS:
+1. Respond with ONLY valid JSON (no explanations, no markdown, no code blocks)
+2. Start your response with {{ and end with }}
+3. Follow this exact structure:
 
 {{
     "steps": [
         {{
             "step": 1,
-            "line": <line number>,
-            "code": "actual code line",
-            "action": "Brief description of what happens",
+            "line": 1,
+            "code": "x = 5",
+            "action": "Assign value 5 to variable x",
             "variables": {{
-                "var_name": {{"value": "current value", "type": "int|str|list|etc", "changed": true|false}}
+                "x": {{"value": "5", "type": "int", "changed": true}}
             }},
-            "call_stack": ["function1", "function2"],
-            "output": "any print output at this step or null",
-            "memory": {{"allocated": "description of memory changes or null"}}
+            "call_stack": [],
+            "output": null
         }}
     ],
     "summary": {{
-        "total_steps": <number>,
-        "variables_created": ["var1", "var2"],
-        "functions_called": ["func1", "func2"],
-        "complexity": "Brief complexity analysis",
-        "final_output": "Final program output"
+        "total_steps": 4,
+        "variables_created": ["x", "y"],
+        "functions_called": [],
+        "complexity": "O(1) - simple sequential execution",
+        "final_output": "Program completed successfully"
     }}
 }}
 
-Important:
-- Include ALL variable changes at each step
-- Show the exact value stored in each variable
-- Track when variables are created, modified, or destroyed
-- For loops, show each iteration
-- For function calls, show call stack changes
-- Be precise and educational"""
+Rules:
+- Keep code simple (max 10 steps for complex programs)
+- Show variables as strings for consistency
+- Set "changed" to true only when variable value changes
+- Use empty array [] for call_stack if no functions
+- Use null for output unless there's a print statement
+- Keep action descriptions brief (under 50 characters)
+
+Now generate the trace for the code above. Remember: ONLY JSON, no other text."""
 
         response = gemini_model.generate_content(prompt)
         response_text = response.text.strip()
         
+        print(f"[VISUALIZE] Raw response length: {len(response_text)}")
+        print(f"[VISUALIZE] First 200 chars: {response_text[:200]}")
+        
+        # Clean up the response - remove any markdown or extra text
+        # Try to find JSON object
+        json_start = response_text.find('{')
+        json_end = response_text.rfind('}') + 1
+        
+        if json_start != -1 and json_end > json_start:
+            response_text = response_text[json_start:json_end]
+            print(f"[VISUALIZE] Extracted JSON from position {json_start} to {json_end}")
+        
         # Remove markdown code blocks if present
-        if response_text.startswith("```"):
-            response_text = re.sub(r'^```(?:json)?\s*\n', '', response_text)
-            response_text = re.sub(r'\n```\s*$', '', response_text)
+        response_text = re.sub(r'^```(?:json)?\s*', '', response_text)
+        response_text = re.sub(r'\s*```$', '', response_text)
         
         # Parse JSON response
         viz_data = json.loads(response_text)
+        
+        # Validate structure
+        if not isinstance(viz_data.get('steps'), list) or len(viz_data['steps']) == 0:
+            raise ValueError("Invalid visualization data: missing or empty steps")
         
         # Save to history
         if session.get('user_id'):
@@ -1447,17 +1492,32 @@ Important:
         return jsonify(viz_data)
         
     except json.JSONDecodeError as e:
-        print(f"JSON Parse Error: {e}")
-        print(f"Response: {response_text[:500]}")
+        print(f"[VISUALIZE] JSON Parse Error: {e}")
+        print(f"[VISUALIZE] Failed response (first 500 chars): {response_text[:500] if 'response_text' in locals() else 'No response'}")
+        
+        # Return a helpful error with the actual response snippet
         return jsonify({
-            "error": "Failed to parse AI response",
-            "detail": "The AI returned an invalid format"
+            "error": "AI returned invalid JSON format",
+            "detail": f"Parse error: {str(e)}. The AI response couldn't be converted to visualization data. Try simplifying your code or try again.",
+            "debug_info": response_text[:200] if 'response_text' in locals() else "No response received"
         }), 500
+        
+    except ValueError as e:
+        print(f"[VISUALIZE] Validation Error: {e}")
+        return jsonify({
+            "error": "Invalid visualization data",
+            "detail": str(e)
+        }), 500
+        
     except Exception as e:
-        print(f"Visualization Error: {e}")
+        print(f"[VISUALIZE] Unexpected Error: {e}")
+        print(f"[VISUALIZE] Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        
         return jsonify({
             "error": "Visualization failed",
-            "detail": str(e)
+            "detail": f"{type(e).__name__}: {str(e)}. Please try again or use simpler code."
         }), 500
 
 
