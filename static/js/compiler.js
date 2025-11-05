@@ -1827,6 +1827,59 @@ ${modifier} + /         - Show this help
   let currentStep = 0;
   let visualizationData = null;
 
+  // Helper function to render values in Python Tutor style
+  function renderValue(value, type) {
+    // Handle arrays/lists
+    if (Array.isArray(value)) {
+      return `
+        <div style="display: inline-flex; gap: 2px; background: #3a3a4a; padding: 0.3rem; border-radius: 4px;">
+          ${value.map((item, idx) => `
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <div style="background: #4CAF50; color: white; padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 3px 3px 0 0; min-width: 40px; text-align: center;">
+                ${idx}
+              </div>
+              <div style="background: #1a1a2e; color: #ececf1; padding: 0.4rem 0.6rem; font-family: monospace; border: 2px solid #4CAF50; border-top: none; border-radius: 0 0 3px 3px; min-width: 40px; text-align: center;">
+                ${item}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+    
+    // Handle objects/dictionaries
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return `
+        <div style="background: #3a3a4a; padding: 0.6rem; border-radius: 4px; border: 2px solid #ffd700;">
+          ${Object.entries(value).map(([k, v]) => `
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.3rem; align-items: center;">
+              <span style="color: #ffd700; font-family: monospace; font-size: 0.85rem; font-weight: bold;">${k}:</span>
+              <span style="color: #ececf1; font-family: monospace; font-size: 0.85rem;">${v}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+    
+    // Handle strings
+    if (type === 'str' || typeof value === 'string') {
+      return `<span style="color: #98c379; font-family: monospace; font-size: 0.95rem;">"${escapeHtml(value)}"</span>`;
+    }
+    
+    // Handle numbers
+    if (type === 'int' || type === 'float' || typeof value === 'number') {
+      return `<span style="color: #d19a66; font-family: monospace; font-size: 0.95rem; font-weight: 600;">${value}</span>`;
+    }
+    
+    // Handle booleans
+    if (type === 'bool' || typeof value === 'boolean') {
+      return `<span style="color: #c678dd; font-family: monospace; font-size: 0.95rem; font-weight: 600;">${value}</span>`;
+    }
+    
+    // Default
+    return `<span style="color: #ececf1; font-family: monospace; font-size: 0.95rem;">${escapeHtml(String(value))}</span>`;
+  }
+
   if (visualizeBtn) {
     visualizeBtn.addEventListener("click", async () => {
       // Check if user is logged in
@@ -1890,40 +1943,117 @@ ${modifier} + /         - Show this help
     const step = visualizationData.steps[currentStep];
     const totalSteps = visualizationData.steps.length;
 
+    // Split code into lines for side-by-side display
+    const codeLines = visualizationData.steps[0] ? 
+      visualizationData.steps.map(s => s.code).filter((v, i, a) => a.indexOf(v) === i) : 
+      [];
+
     let html = `
-      <div style="padding: 2rem;">
+      <div style="padding: 1.5rem; background: #1e1e2e; min-height: 500px;">
         <!-- Controls -->
-        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; align-items: center; justify-content: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-          <button id="vizPrevBtn" ${currentStep === 0 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">⏮ Previous</button>
-          <div style="color: #ececf1; font-weight: bold;">Step ${currentStep + 1} of ${totalSteps}</div>
-          <button id="vizNextBtn" ${currentStep === totalSteps - 1 ? 'disabled' : ''} style="padding: 0.5rem 1rem; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">Next ⏭</button>
+        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; align-items: center; justify-content: center; padding: 1rem; background: #2a2b3c; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+          <button id="vizPrevBtn" ${currentStep === 0 ? 'disabled' : ''} style="padding: 0.6rem 1.2rem; background: ${currentStep === 0 ? '#555' : '#4CAF50'}; color: white; border: none; border-radius: 6px; cursor: ${currentStep === 0 ? 'not-allowed' : 'pointer'}; font-size: 0.95rem; font-weight: 600; transition: all 0.2s;">◀ Back</button>
+          <div style="color: #ececf1; font-weight: bold; font-size: 1.1rem; padding: 0 1rem;">Step ${currentStep + 1} / ${totalSteps}</div>
+          <button id="vizNextBtn" ${currentStep === totalSteps - 1 ? 'disabled' : ''} style="padding: 0.6rem 1.2rem; background: ${currentStep === totalSteps - 1 ? '#555' : '#4CAF50'}; color: white; border: none; border-radius: 6px; cursor: ${currentStep === totalSteps - 1 ? 'not-allowed' : 'pointer'}; font-size: 0.95rem; font-weight: 600; transition: all 0.2s;">Forward ▶</button>
         </div>
 
-        <!-- Current Line -->
-        <div style="margin-bottom: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #10a37f22, #10a37f11); border-left: 4px solid #10a37f; border-radius: 8px;">
-          <div style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">Line ${step.line}</div>
-          <div style="font-family: 'Consolas', 'Monaco', monospace; color: #ececf1; font-size: 1.1rem; margin-bottom: 0.5rem;"><code>${escapeHtml(step.code)}</code></div>
-          <div style="color: #10a37f; font-weight: bold;">→ ${step.action}</div>
-        </div>
+        <!-- Python Tutor Style: Two Column Layout -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start;">
+          
+          <!-- LEFT: Code Column -->
+          <div style="background: #252535; border-radius: 8px; padding: 1.5rem; border: 2px solid #3a3a4a; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+            <h3 style="color: #ffd700; margin: 0 0 1rem 0; font-size: 1.1rem; border-bottom: 2px solid #ffd700; padding-bottom: 0.5rem;">📝 Code</h3>
+            <div style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.95rem; line-height: 1.8;">
+              ${codeLines.map((line, idx) => {
+                const isCurrentLine = step.line === idx + 1;
+                return `
+                  <div style="display: flex; align-items: center; padding: 0.3rem 0.5rem; ${isCurrentLine ? 'background: #ffd70033; border-left: 4px solid #ffd700; margin-left: -0.5rem; padding-left: 0.8rem;' : ''}">
+                    <span style="color: #666; min-width: 30px; text-align: right; margin-right: 1rem; user-select: none;">${idx + 1}</span>
+                    <span style="color: ${isCurrentLine ? '#ffd700' : '#ececf1'}; font-weight: ${isCurrentLine ? 'bold' : 'normal'};">${escapeHtml(line)}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            <div style="margin-top: 1rem; padding: 0.8rem; background: #1a1a2e; border-radius: 6px; border-left: 4px solid #4CAF50;">
+              <div style="color: #4CAF50; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.3rem;">→ Action:</div>
+              <div style="color: #ececf1; font-size: 0.9rem;">${step.action}</div>
+            </div>
+          </div>
 
-        <!-- Variables -->
-        ${Object.keys(step.variables || {}).length > 0 ? `
-        <div style="margin-bottom: 2rem;">
-          <h3 style="color: #ececf1; margin-bottom: 1rem;">📦 Variables</h3>
-          <div style="display: grid; gap: 1rem;">
-            ${Object.entries(step.variables).map(([name, info]) => `
-              <div style="padding: 1rem; background: ${info.changed ? 'rgba(16, 163, 127, 0.1)' : 'rgba(255,255,255,0.05)'}; border-radius: 8px; border-left: 3px solid ${info.changed ? '#10a37f' : '#666'};">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                  <span style="color: #1890ff; font-weight: bold; font-family: monospace;">${name}</span>
-                  <span style="color: #666; font-size: 0.85rem;">${info.type}</span>
+          <!-- RIGHT: Memory/Variables Column (Python Tutor Style) -->
+          <div>
+            <!-- Frames Header -->
+            <div style="background: #252535; border-radius: 8px 8px 0 0; padding: 1rem 1.5rem; border: 2px solid #3a3a4a; border-bottom: none;">
+              <h3 style="color: #66d9ef; margin: 0; font-size: 1.1rem;">🧠 Frames (Memory State)</h3>
+            </div>
+
+            <!-- Global Frame -->
+            <div style="background: #252535; border: 2px solid #3a3a4a; border-radius: 0 0 8px 8px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+              
+              ${Object.keys(step.variables || {}).length > 0 ? `
+                <!-- Variables Table (Python Tutor Style) -->
+                <div style="margin-bottom: 1rem;">
+                  <div style="background: #66d9ef22; padding: 0.6rem 1rem; border-radius: 6px 6px 0 0; border: 2px solid #66d9ef; border-bottom: none;">
+                    <span style="color: #66d9ef; font-weight: bold; font-size: 0.95rem;">Global frame</span>
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; background: #1a1a2e; border: 2px solid #66d9ef; border-top: none;">
+                    <thead>
+                      <tr style="background: #2a2a3e;">
+                        <th style="padding: 0.6rem; text-align: left; color: #888; font-size: 0.85rem; border-bottom: 1px solid #3a3a4a; font-weight: 600;">Variable</th>
+                        <th style="padding: 0.6rem; text-align: left; color: #888; font-size: 0.85rem; border-bottom: 1px solid #3a3a4a; font-weight: 600;">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${Object.entries(step.variables).map(([name, info]) => `
+                        <tr style="border-bottom: 1px solid #2a2a3a; ${info.changed ? 'background: #4CAF5022;' : ''}">
+                          <td style="padding: 0.8rem; color: #ffd700; font-family: monospace; font-weight: bold; font-size: 0.95rem; border-right: 1px solid #2a2a3a;">
+                            ${name}
+                            ${info.changed ? '<span style="color: #4CAF50; font-size: 0.8rem; margin-left: 0.5rem;">●</span>' : ''}
+                          </td>
+                          <td style="padding: 0.8rem;">
+                            ${renderValue(info.value, info.type)}
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
                 </div>
-                <div style="color: #ececf1; font-family: monospace;">${typeof info.value === 'object' ? JSON.stringify(info.value) : info.value}</div>
-                ${info.changed ? '<div style="color: #10a37f; font-size: 0.85rem; margin-top: 0.5rem;">✓ Changed</div>' : ''}
-              </div>
-            `).join('')}
+              ` : `
+                <div style="padding: 2rem; text-align: center; color: #666; font-style: italic;">
+                  No variables yet
+                </div>
+              `}
+
+              <!-- Call Stack Frames -->
+              ${step.call_stack && step.call_stack.length > 0 ? `
+                <div style="margin-top: 1.5rem;">
+                  <div style="background: #ff669922; padding: 0.6rem 1rem; border-radius: 6px; border: 2px solid #ff6699; margin-bottom: 0.5rem;">
+                    <span style="color: #ff6699; font-weight: bold; font-size: 0.9rem;">📚 Call Stack</span>
+                  </div>
+                  ${step.call_stack.map((func, idx) => `
+                    <div style="padding: 0.6rem 1rem; background: #2a2a3e; border-left: 4px solid ${idx === step.call_stack.length - 1 ? '#ff6699' : '#555'}; margin-bottom: 0.3rem; border-radius: 4px;">
+                      <span style="color: ${idx === step.call_stack.length - 1 ? '#ff6699' : '#888'}; font-family: monospace; font-size: 0.9rem;">
+                        ${'→ '.repeat(idx + 1)} ${func}
+                      </span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+
+              <!-- Output Section -->
+              ${step.output ? `
+                <div style="margin-top: 1.5rem;">
+                  <div style="background: #4CAF5022; padding: 0.6rem 1rem; border-radius: 6px; border: 2px solid #4CAF50; margin-bottom: 0.5rem;">
+                    <span style="color: #4CAF50; font-weight: bold; font-size: 0.9rem;">📟 Output</span>
+                  </div>
+                  <div style="padding: 1rem; background: #0d1117; border: 2px solid #4CAF50; border-radius: 6px; font-family: 'Consolas', 'Monaco', monospace; color: #4CAF50; font-size: 0.9rem; white-space: pre-wrap;">
+                    ${escapeHtml(step.output)}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
           </div>
         </div>
-        ` : ''}
 
         <!-- Call Stack -->
         ${step.call_stack && step.call_stack.length > 0 ? `
