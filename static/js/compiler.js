@@ -1,3 +1,115 @@
+// ============================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================
+function showToast(message, type = 'info', duration = 4000) {
+  // Create toast container if it doesn't exist
+  let toastContainer = document.getElementById('toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    `;
+    document.body.appendChild(toastContainer);
+  }
+
+  // Toast configurations
+  const config = {
+    success: {
+      icon: '✅',
+      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: '#fff',
+      shadow: '0 8px 32px rgba(102, 126, 234, 0.4)'
+    },
+    error: {
+      icon: '❌',
+      gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      color: '#fff',
+      shadow: '0 8px 32px rgba(245, 87, 108, 0.4)'
+    },
+    warning: {
+      icon: '⚠️',
+      gradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+      color: '#333',
+      shadow: '0 8px 32px rgba(252, 182, 159, 0.4)'
+    },
+    info: {
+      icon: '💡',
+      gradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+      color: '#333',
+      shadow: '0 8px 32px rgba(168, 237, 234, 0.4)'
+    }
+  };
+
+  const toastConfig = config[type] || config.info;
+
+  // Create toast element
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.style.cssText = `
+    background: ${toastConfig.gradient};
+    color: ${toastConfig.color};
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: ${toastConfig.shadow};
+    min-width: 300px;
+    max-width: 500px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: all;
+    cursor: pointer;
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  `;
+
+  toast.innerHTML = `
+    <span style="font-size: 24px; flex-shrink: 0;">${toastConfig.icon}</span>
+    <span style="flex: 1; line-height: 1.4;">${message}</span>
+    <span style="opacity: 0.7; font-size: 20px; flex-shrink: 0; cursor: pointer;" onclick="this.parentElement.remove()">×</span>
+  `;
+
+  toastContainer.appendChild(toast);
+
+  // Animate in
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      toast.style.transform = 'translateX(0)';
+      toast.style.opacity = '1';
+    });
+  });
+
+  // Click to dismiss
+  toast.addEventListener('click', () => {
+    toast.style.transform = 'translateX(400px)';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 400);
+  });
+
+  // Auto dismiss
+  setTimeout(() => {
+    toast.style.transform = 'translateX(400px)';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 400);
+  }, duration);
+
+  // Return toast element for chaining
+  return toast;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Compiler.js loaded successfully!");
   
@@ -267,7 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sessionStorage.removeItem('sharedLanguage');
     sessionStorage.removeItem('sharedTitle');
     
-    alert(`✅ Loaded shared code: "${sharedTitle}"`);
+    showToast(`Loaded shared code: "${sharedTitle}"`, 'success');
   }
 
   // ---- NEW CODE BUTTON ----
@@ -301,8 +413,8 @@ document.addEventListener("DOMContentLoaded", () => {
     saveBtn.addEventListener('click', async () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to save your code.\n\nCreate a free account to save and manage your projects.");
-        window.location.href = "/login";
+        showToast("Please login to save your code. Create a free account to save and manage your projects.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
       
@@ -310,7 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text;
       
       if (!code) {
-        alert("⚠️ Please write some code before saving!");
+        showToast("Please write some code before saving!", 'warning');
         return;
       }
       
@@ -335,12 +447,12 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const data = await response.json();
         if (data.success) {
-          alert("✅ " + data.message + "\n\nView your saved projects in 📁 My Code");
+          showToast(data.message + " View your saved projects in 📁 My Code", 'success', 5000);
         } else {
-          alert("❌ " + (data.error || "Failed to save"));
+          showToast(data.error || "Failed to save", 'error');
         }
       } catch (err) {
-        alert("❌ Error: " + err.message);
+        showToast("Error: " + err.message, 'error');
       }
     });
   }
@@ -349,8 +461,8 @@ document.addEventListener("DOMContentLoaded", () => {
     shareBtn.addEventListener('click', async () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to share your code.\n\nCreate a free account to share your projects with others.");
-        window.location.href = "/login";
+        showToast("Please login to share your code. Create a free account to share your projects with others.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
       
@@ -358,7 +470,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text;
       
       if (!code) {
-        alert("⚠️ Please write some code before sharing!");
+        showToast("Please write some code before sharing!", 'warning');
         return;
       }
       
@@ -385,12 +497,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.success) {
           // Copy link to clipboard
           navigator.clipboard.writeText(data.share_link);
-          alert("✅ " + data.message + "\n\nLink copied to clipboard:\n" + data.share_link);
+          showToast(data.message + " Link copied to clipboard: " + data.share_link, 'success', 6000);
         } else {
-          alert("❌ " + (data.error || "Failed to create share link"));
+          showToast(data.error || "Failed to create share link", 'error');
         }
       } catch (err) {
-        alert("❌ Error: " + err.message);
+        showToast("Error: " + err.message, 'error');
       }
     });
   }
@@ -960,8 +1072,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
         console.log("User not logged in, redirecting...");
-        alert("⚠️ Please login to use the AI Explain feature.\n\nThis is a premium feature available to registered users.");
-        window.location.href = "/login";
+        showToast("Please login to use the AI Explain feature. This is a premium feature available to registered users.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
       
@@ -1064,8 +1176,8 @@ document.addEventListener("DOMContentLoaded", () => {
     debugBtn.addEventListener("click", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to use the AI Debugger feature.\n\nThis is a premium feature available to registered users.");
-        window.location.href = "/login";
+        showToast("Please login to use the AI Debugger feature. This is a premium feature available to registered users.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
       
@@ -1073,7 +1185,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
       
       if (!code) {
-        alert("⚠️ Please write some code before debugging!");
+        showToast("Please write some code before debugging!", 'warning');
         return;
       }
 
@@ -1104,8 +1216,8 @@ document.addEventListener("DOMContentLoaded", () => {
     optimizeBtn.addEventListener("click", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to use the AI Optimizer feature.\n\nThis is a premium feature available to registered users.");
-        window.location.href = "/login";
+        showToast("Please login to use the AI Optimizer feature. This is a premium feature available to registered users.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
       
@@ -1113,7 +1225,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const languageText = languageSelect.options[languageSelect.selectedIndex].text || "Python";
       
       if (!code) {
-        alert("⚠️ Please write some code before optimizing!");
+        showToast("Please write some code before optimizing!", 'warning');
         return;
       }
 
@@ -1185,7 +1297,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const code = codeEditor.value;
       
       if (!code) {
-        alert("⚠️ No code to copy!");
+        showToast("No code to copy!", 'warning');
         return;
       }
 
@@ -1195,13 +1307,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const originalText = copyCodeBtn.textContent;
         copyCodeBtn.textContent = "✓ Copied!";
         copyCodeBtn.style.background = "#10b981";
+        showToast("Code copied to clipboard!", 'success');
         
         setTimeout(() => {
           copyCodeBtn.textContent = originalText;
           copyCodeBtn.style.background = "";
         }, 2000);
       }).catch(err => {
-        alert("Failed to copy: " + err);
+        showToast("Failed to copy: " + err, 'error');
       });
     });
   }
@@ -1213,15 +1326,15 @@ document.addEventListener("DOMContentLoaded", () => {
     downloadCodeBtn.addEventListener("click", () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to download your code.\n\nCreate a free account to download and save your projects.");
-        window.location.href = "/login";
+        showToast("Please login to download your code. Create a free account to download and save your projects.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
       
       const code = codeEditor.value;
       
       if (!code) {
-        alert("⚠️ No code to download!");
+        showToast("No code to download!", 'warning');
         return;
       }
 
@@ -1346,7 +1459,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       
       if (data.error) {
-        alert('Error loading history item: ' + data.error);
+        showToast('Error loading history item: ' + data.error, 'error');
         return;
       }
 
@@ -1376,7 +1489,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      alert('Error loading history: ' + err.message);
+      showToast('Error loading history: ' + err.message, 'error');
     }
   }
 
@@ -1394,11 +1507,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.success) {
         // Reload history
         loadHistory();
+        showToast('History item deleted successfully', 'success');
       } else {
-        alert('Error deleting: ' + data.error);
+        showToast('Error deleting: ' + data.error, 'error');
       }
     } catch (err) {
-      alert('Error deleting history: ' + err.message);
+      showToast('Error deleting history: ' + err.message, 'error');
     }
   };
 
@@ -1525,11 +1639,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         console.log('✅ Project loaded successfully:', data.title);
+        showToast('Project loaded successfully: ' + data.title, 'success');
       } else {
-        alert('❌ Failed to load project: ' + (data.error || 'Unknown error'));
+        showToast('Failed to load project: ' + (data.error || 'Unknown error'), 'error');
       }
     } catch (err) {
-      alert('❌ Error loading project: ' + err.message);
+      showToast('Error loading project: ' + err.message, 'error');
     }
   }
 
@@ -1656,7 +1771,7 @@ ${modifier} + /         - Show this help
 💡 Tip: These shortcuts work anywhere on the page!
     `.trim();
     
-    alert(helpMessage);
+    showToast(helpMessage, 'info', 8000);
   };
 
   console.log("✅ Keyboard shortcuts enabled! Press Ctrl+/ for help");
@@ -1671,14 +1786,14 @@ ${modifier} + /         - Show this help
     qualityBtn.addEventListener("click", async () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to use the Code Quality Analyzer.\n\nThis is a premium feature available to registered users.");
-        window.location.href = "/login";
+        showToast("Please login to use the Code Quality Analyzer. This is a premium feature available to registered users.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
 
       const code = codeEditor.value.trim();
       if (!code) {
-        alert("⚠️ Please write some code before analyzing quality!");
+        showToast("Please write some code before analyzing quality!", 'warning');
         return;
       }
 
@@ -1884,14 +1999,14 @@ ${modifier} + /         - Show this help
     visualizeBtn.addEventListener("click", async () => {
       // Check if user is logged in
       if (!window.USER_LOGGED_IN) {
-        alert("⚠️ Please login to use the Code Visualizer.\n\nThis is a premium feature available to registered users.");
-        window.location.href = "/login";
+        showToast("Please login to use the Code Visualizer. This is a premium feature available to registered users.", 'warning', 5000);
+        setTimeout(() => window.location.href = "/login", 1500);
         return;
       }
 
       const code = codeEditor.value.trim();
       if (!code) {
-        alert("⚠️ Please write some code before visualizing!");
+        showToast("Please write some code before visualizing!", 'warning');
         return;
       }
 
