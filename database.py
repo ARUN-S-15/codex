@@ -24,7 +24,10 @@ def get_db_connection():
             return conn
         else:
             import sqlite3
-            return sqlite3.connect('codex.db')
+            # Use persistent disk on Render
+            db_path = os.getenv('DATABASE_PATH', '/opt/render/project/data/codex.db')
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            return sqlite3.connect(db_path)
     except Error as e:
         print(f"Error connecting to database: {e}")
         raise
