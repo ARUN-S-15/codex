@@ -1,4 +1,4 @@
-# database.py - Database abstraction layer for MySQL and SQLite
+# database.py - Database abstraction layer for MySQL, PostgreSQL and SQLite
 import os
 import mysql.connector
 from mysql.connector import Error
@@ -16,17 +16,24 @@ MYSQL_CONFIG = {
     'database': os.getenv('MYSQL_DATABASE', 'codex_db')
 }
 
+# PostgreSQL configuration (for Render deployment)
+DATABASE_URL = os.getenv('DATABASE_URL', '')
+
 def get_db_connection():
     """Get database connection based on DB_TYPE"""
     try:
-        if DB_TYPE == 'mysql':
+        if DB_TYPE == 'postgresql':
+            import psycopg2
+            return psycopg2.connect(DATABASE_URL)
+        elif DB_TYPE == 'mysql':
             conn = mysql.connector.connect(**MYSQL_CONFIG)
             return conn
         else:
             import sqlite3
-            # Use persistent disk on Render
-            db_path = os.getenv('DATABASE_PATH', '/opt/render/project/data/codex.db')
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            # Use persistent disk on Render or local file
+            db_path = os.getenv('DATABASE_PATH', 'codex.db')
+            if db_path != 'codex.db':
+                os.makedirs(os.path.dirname(db_path), exist_ok=True)
             return sqlite3.connect(db_path)
     except Error as e:
         print(f"Error connecting to database: {e}")
@@ -137,14 +144,109 @@ def init_mysql_database():
         print(f"❌ Error initializing MySQL database: {e}")
         return False
 
+def init_postgresql_database():
+    """Initialize PostgreSQL database and create tables"""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        
+        # Create users table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                email_verified BOOLEAN DEFAULT FALSE,
+                verification_token VARCHAR(100),
+                reset_token VARCHAR(100),
+                reset_token_expiry TIMESTAMP NULL,
+                profile_picture VARCHAR(500),
+                is_admin BOOLEAN DEFAULT FALSE,
+                oauth_provider VARCHAR(50),
+                oauth_id VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP NULL
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_username ON users(username)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_email ON users(email)')
+        
+        # Create code_history table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS code_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                activity_type VARCHAR(50) NOT NULL,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50),
+                title VARCHAR(255),
+                output TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_created ON code_history(user_id, created_at)')
+        
+        # Create shared_codes table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS shared_codes (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                share_token VARCHAR(100) UNIQUE NOT NULL,
+                views INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_share_token ON shared_codes(share_token)')
+        
+        # Create projects table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_projects ON projects(user_id, updated_at)')
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✅ PostgreSQL database 'CODEX' initialized successfully!")
+        print("   - users table created")
+        print("   - code_history table created")
+        print("   - shared_codes table created")
+        print("   - projects table created")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error initializing PostgreSQL database: {e}")
+        return False
+
 def init_db():
-    """Initialize database (MySQL or SQLite)"""
-    if DB_TYPE == 'mysql':
+    """Initialize database (MySQL, PostgreSQL or SQLite)"""
+    if DB_TYPE == 'postgresql':
+        return init_postgresql_database()
+    elif DB_TYPE == 'mysql':
         return init_mysql_database()
     else:
         # SQLite initialization (fallback)
         import sqlite3
-        conn = sqlite3.connect('codex.db')
+        db_path = os.getenv('DATABASE_PATH', 'codex.db')
+        if db_path != 'codex.db':
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -152,7 +254,16 @@ def init_db():
                 username TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                email_verified BOOLEAN DEFAULT 0,
+                verification_token VARCHAR(100),
+                reset_token VARCHAR(100),
+                reset_token_expiry TIMESTAMP NULL,
+                profile_picture VARCHAR(500),
+                is_admin BOOLEAN DEFAULT 0,
+                oauth_provider VARCHAR(50),
+                oauth_id VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP NULL
             )
         ''')
         cursor.execute('''
@@ -165,6 +276,31 @@ def init_db():
                 title VARCHAR(255),
                 output TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS shared_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                share_token VARCHAR(100) UNIQUE NOT NULL,
+                views INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                code_snippet TEXT NOT NULL,
+                language VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ''')
