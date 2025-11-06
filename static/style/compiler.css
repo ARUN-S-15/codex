@@ -1237,8 +1237,61 @@ select.form-control {
 }
 
 @media (max-width: 640px) {
+  /* Mobile: Make code editor horizontally scrollable */
+  .code-editor {
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  
+  #codeEditor {
+    min-width: 600px; /* Allow horizontal scroll for wider code */
+    white-space: pre; /* Prevent text wrapping */
+  }
+  
+  .line-numbers {
+    min-width: 40px;
+  }
+  
+  /* Button layout improvements for mobile */
   .controls__right {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+    overflow-x: auto;
+    padding-bottom: var(--space-8);
+  }
+  
+  .controls__right::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .controls__right::-webkit-scrollbar-track {
+    background: var(--color-charcoal-700);
+  }
+  
+  .controls__right::-webkit-scrollbar-thumb {
+    background: var(--color-teal-500);
+    border-radius: 2px;
+  }
+  
+  /* Make buttons more compact on mobile */
+  .button-primary,
+  .button-secondary,
+  .button-tertiary {
+    padding: var(--space-10) var(--space-14);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  
+  /* Ensure Save and Copy buttons are visible with horizontal scroll */
+  .editor-header {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .editor-header .controls__right {
+    min-width: max-content;
   }
   
   .tab-button {
@@ -1248,6 +1301,19 @@ select.form-control {
   
   .header__title {
     font-size: var(--font-size-3xl);
+  }
+  
+  /* Better mobile editor sizing */
+  .editor-container {
+    min-height: 400px;
+  }
+  
+  /* Make sure terminal/output is scrollable too */
+  #terminalOutput,
+  #resultBox {
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 }
 

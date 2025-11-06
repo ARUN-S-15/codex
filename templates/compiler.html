@@ -478,6 +478,36 @@
       transform: translateY(0);
     }
     
+    /* Mobile: Make editor scrollable and buttons always visible */
+    @media (max-width: 640px) {
+      .copy-btn-overlay {
+        position: sticky;
+        top: 0.4rem;
+        font-size: 0.75rem;
+        padding: 0.35rem 0.7rem;
+        z-index: 1001;
+      }
+      
+      #saveBtn {
+        right: 4.5rem !important;
+      }
+      
+      #copyCodeBtn {
+        right: 0.4rem;
+      }
+      
+      .editor-container {
+        overflow-x: auto;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      #codeEditor {
+        min-width: 600px; /* Enable horizontal scrolling */
+        width: 100%;
+      }
+    }
+    
     .editor-container {
       position: relative;
       width: 100%;
