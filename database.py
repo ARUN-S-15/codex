@@ -24,7 +24,9 @@ def get_db_connection():
     try:
         if DB_TYPE == 'postgresql':
             import psycopg2
-            return psycopg2.connect(DATABASE_URL)
+            conn = psycopg2.connect(DATABASE_URL)
+            conn.autocommit = False  # Explicit transaction control
+            return conn
         elif DB_TYPE == 'mysql':
             conn = mysql.connector.connect(**MYSQL_CONFIG)
             return conn
@@ -35,6 +37,9 @@ def get_db_connection():
             if db_path != 'codex.db':
                 os.makedirs(os.path.dirname(db_path), exist_ok=True)
             return sqlite3.connect(db_path)
+    except Exception as e:
+        print(f"❌ Error connecting to database ({DB_TYPE}): {e}")
+        raise
     except Error as e:
         print(f"Error connecting to database: {e}")
         raise
@@ -311,10 +316,10 @@ def init_db():
 
 def execute_query(query, params=None, fetch=False):
     """
-    Execute a database query with proper parameter handling for MySQL/SQLite
+    Execute a database query with proper parameter handling for MySQL/PostgreSQL/SQLite
     
     Args:
-        query: SQL query string (use %s for MySQL, ? for SQLite)
+        query: SQL query string (use %s for MySQL/PostgreSQL, ? for SQLite)
         params: Tuple of parameters
         fetch: Whether to fetch results (True for SELECT, False for INSERT/UPDATE)
     
@@ -327,8 +332,10 @@ def execute_query(query, params=None, fetch=False):
     
     try:
         # Convert query placeholders if needed
-        if DB_TYPE == 'mysql' and '?' in query:
+        if DB_TYPE in ['mysql', 'postgresql'] and '?' in query:
             query = query.replace('?', '%s')
+        elif DB_TYPE == 'sqlite' and '%s' in query:
+            query = query.replace('%s', '?')
         
         if params:
             cursor.execute(query, params)
@@ -361,8 +368,10 @@ def fetch_one(query, params=None):
     
     try:
         # Convert query placeholders if needed
-        if DB_TYPE == 'mysql' and '?' in query:
+        if DB_TYPE in ['mysql', 'postgresql'] and '?' in query:
             query = query.replace('?', '%s')
+        elif DB_TYPE == 'sqlite' and '%s' in query:
+            query = query.replace('%s', '?')
         
         if params:
             cursor.execute(query, params)
