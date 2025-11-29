@@ -1817,14 +1817,23 @@ ${modifier} + /         - Show this help
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "Quality analysis failed");
+          console.error("Quality API error:", errorData);
+          const errorMsg = errorData.detail ? `${errorData.error}: ${errorData.detail}` : (errorData.error || "Quality analysis failed");
+          throw new Error(errorMsg);
         }
 
         const data = await response.json();
         displayQualityScore(data);
       } catch (error) {
         console.error("Quality analysis error:", error);
-        qualityBox.innerHTML = `<div class="error-message">❌ ${error.message}</div>`;
+        qualityBox.innerHTML = `
+          <div class="error-message">
+            <h3>❌ Quality Analysis Error</h3>
+            <p style="margin-top: 0.5rem; font-size: 0.95rem;">${error.message}</p>
+            <p style="margin-top: 1rem; font-size: 0.85rem; opacity: 0.7;">
+              💡 Try simplifying your code or check the console (F12) for details
+            </p>
+          </div>`;
       } finally {
         qualityBtn.disabled = false;
         qualityBtn.innerHTML = originalText;
@@ -2030,7 +2039,9 @@ ${modifier} + /         - Show this help
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "Visualization failed");
+          console.error("Visualization API error:", errorData);
+          const errorMsg = errorData.detail ? `${errorData.error}: ${errorData.detail}` : (errorData.error || "Visualization failed");
+          throw new Error(errorMsg);
         }
 
         visualizationData = await response.json();
@@ -2038,7 +2049,14 @@ ${modifier} + /         - Show this help
         displayVisualization();
       } catch (error) {
         console.error("Visualization error:", error);
-        visualizationBox.innerHTML = `<div class="error-message">❌ ${error.message}</div>`;
+        visualizationBox.innerHTML = `
+          <div class="error-message">
+            <h3>❌ Visualization Error</h3>
+            <p style="margin-top: 0.5rem; font-size: 0.95rem;">${error.message}</p>
+            <p style="margin-top: 1rem; font-size: 0.85rem; opacity: 0.7;">
+              💡 Try simplifying your code or check the console (F12) for details
+            </p>
+          </div>`;
       } finally {
         visualizeBtn.disabled = false;
         visualizeBtn.innerHTML = originalText;
