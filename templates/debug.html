@@ -72,40 +72,20 @@
       color: #10a37f;
     }
 
-    /* Layout */
+    /* Layout - Single column like compiler */
     .main-container {
       display: flex;
-      height: calc(100vh - 70px);
-    }
-
-    /* History Box */
-    .history {
-      width: 15%;
-      background: #111;
-      border-right: 1px solid #2a2b32;
-      padding: 1rem;
-      overflow-y: auto;
-    }
-
-    .history h2 {
-      font-size: 1rem;
-      margin-bottom: 1rem;
-      color: #10a37f;
-    }
-
-    .history p {
-      font-size: 0.9rem;
-      background: #1e1e1e;
-      padding: 0.5rem;
-      border-radius: 6px;
-      margin-bottom: 0.5rem;
-      cursor: pointer;
+      flex-direction: column;
+      min-height: calc(100vh - 70px);
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      gap: 1.5rem;
     }
 
     /* Editor */
     .editor-section {
-      width: 45%;
-      padding: 1rem;
+      width: 100%;
       display: flex;
       flex-direction: column;
     }
@@ -270,10 +250,9 @@
       background: #0d8b6d;
     }
 
-    /* Results side - Issues only */
+    /* Results section - below editor */
     .results {
-      width: 40%;
-      padding: 1rem;
+      width: 100%;
       display: none;
       flex-direction: column;
       animation: fadeIn 0.5s ease-in-out;
@@ -283,14 +262,19 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      height: 100%;
+      background: #1d1d1d;
+      border-radius: 10px;
+      overflow: hidden;
     }
 
     .result-box h3 {
-      margin: 0 0 0.5rem 0;
+      margin: 0;
+      padding: 0.8rem 1rem;
+      background: #40414f;
       color: #10a37f;
       font-size: 1.1rem;
       font-weight: 600;
+      border-bottom: 1px solid #2a2b32;
     }
 
     /* ChatGPT-style issues display */
@@ -438,32 +422,25 @@
 
   <!-- MAIN LAYOUT -->
   <div class="main-container">
-    <!-- History Box -->
-    <aside class="history" id="historyBox">
-      <h2>History</h2>
-      <p>Previous debug 1</p>
-      <p>Previous debug 2</p>
-    </aside>
-
-    <!-- Debugged Code Section (Left) -->
+    <!-- Code Editor Section -->
     <div class="editor-section">
-      <h3 style="color: #10a37f; margin-bottom: 0.5rem;">✨ Debugged Code (Editable)</h3>
+      <h3 style="color: #10a37f; margin-bottom: 0.5rem;">📝 Your Code</h3>
       <div class="editor-container">
-        <button class="copy-btn" id="copyFixedBtn">📋 Copy code</button>
+        <button class="copy-btn" id="copyFixedBtn">📋 Copy</button>
         <textarea id="codeInput"></textarea>
       </div>
       <button id="debugBtn">🐞 Analyze & Debug Code</button>
     </div>
 
-    <!-- Issues Section (Right) -->
+    <!-- Issues Found Section (Below) -->
     <div class="results" id="results">
       <div class="result-box">
         <h3>🔍 Issues Found</h3>
-        <div style="position: relative; flex: 1;">
-          <div id="issues" style="height: 100%; overflow: auto; background: #1d1d1d; border-radius: 10px;">
-            <p style="padding: 2rem; text-align: center; color: #888;">Paste code and click "Analyze & Debug Code" to see issues.</p>
+        <div style="position: relative;">
+          <div id="issues" style="min-height: 300px; padding: 1rem; overflow: auto;">
+            <p style="padding: 2rem; text-align: center; color: #888;">Click "Analyze & Debug Code" to see issues and get fixes.</p>
           </div>
-          <button class="copy-btn" id="copyIssuesBtn">📋 Copy issues</button>
+          <button class="copy-btn" id="copyIssuesBtn" style="top: 1rem; right: 1rem;">📋 Copy Issues</button>
         </div>
       </div>
     </div>
@@ -478,7 +455,6 @@
   const debugBtn = document.getElementById("debugBtn");
   const issuesBox = document.getElementById("issues");
   const results = document.getElementById("results");
-  const historyBox = document.getElementById("historyBox");
   const codeInputTextarea = document.getElementById("codeInput");
 
   let currentLanguage = "python"; // default
@@ -618,10 +594,6 @@
       // Clear localStorage after loading
       localStorage.removeItem("debugCode");
       localStorage.removeItem("debugLanguage");
-    } else {
-      // Show results panel with instructions if no code loaded
-      results.style.display = "flex";
-      historyBox.style.display = "none";
     }
   });
 
@@ -740,8 +712,7 @@
     if (!codeToAnalyze || !codeToAnalyze.trim()) {
       issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ No code to analyze.<br><br>Go to the <a href="/compiler" style="color: #10a37f;">compiler page</a> and click the Debug button.</div>';
       codeInput.value = "";
-      results.style.display = "flex";
-      historyBox.style.display = "none";
+      results.style.display = "block";
       return;
     }
 
@@ -756,9 +727,7 @@
     }
     
     issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">' + loadingMessage + '</div>';
-    codeInput.value = "⏳ Auto-fixing errors...\n\nPlease wait while we analyze and debug your code...";
-    results.style.display = "flex";
-    historyBox.style.display = "none";
+    results.style.display = "block";
 
     try {
       console.log("Sending debug request with language:", currentLanguage);
@@ -775,16 +744,15 @@
       const data = await response.json();
       console.log("Debug response received:", data);
       
-      // Display auto-fixed code in left panel (line by line)
+      // Display auto-fixed code in editor
       if (data.fixed_code) {
-        codeInput.value = data.fixed_code;
-        updateLineNumbers();
-        updateSyntaxHighlight();
+        codeMirrorEditor.setValue(data.fixed_code);
       } else {
-        codeInput.value = "# Unable to auto-fix\n\n" + codeToAnalyze;
-        updateLineNumbers();
-        updateSyntaxHighlight();
+        codeMirrorEditor.setValue("# Unable to auto-fix\n\n" + codeToAnalyze);
       }
+      
+      // Refresh CodeMirror
+      setTimeout(() => codeMirrorEditor.refresh(), 100);
       
       // Display issues found by linter in right panel with better formatting
       const issuesText = data.issues || "✅ No issues found! Your code looks good.";
@@ -850,19 +818,19 @@
     } else if (originalCode) {
       runDebugAnalysis(originalCode);
     } else {
-      issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ No code to analyze.<br><br>Please go to the <a href="/compiler" style="color: #10a37f;">compiler page</a> and click the Debug button, or paste your code in the left panel.</div>';
-      results.style.display = "flex";
-      historyBox.style.display = "none";
+      issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ No code to analyze.<br><br>Please go to the <a href="/compiler" style="color: #10a37f;">compiler page</a> and click the Debug button, or paste your code above.</div>';
+      results.style.display = "block";
     }
   });
 
   // Copy Buttons with better feedback
   document.getElementById("copyFixedBtn").addEventListener("click", () => {
-    navigator.clipboard.writeText(codeInput.value).then(() => {
+    navigator.clipboard.writeText(codeMirrorEditor.getValue()).then(() => {
       const btn = document.getElementById("copyFixedBtn");
       const originalText = btn.textContent;
       btn.textContent = "✓ Copied!";
       btn.style.background = "#10a37f";
+      btn.style.color = "#fff";
       setTimeout(() => {
         btn.textContent = originalText;
         btn.style.background = "";

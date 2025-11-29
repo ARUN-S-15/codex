@@ -33,20 +33,23 @@
       overflow: hidden;
     }
 
-    /* Main editor area */
+    /* Main editor area - Single column layout like compiler */
     .main {
       flex: 1;
       display: flex;
-      flex-direction: row;
-      align-items: stretch;
-      padding: 1rem;
-      gap: 1rem;
+      flex-direction: column;
+      padding: 2rem;
+      gap: 1.5rem;
       position: relative;
+      overflow-y: auto;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
     }
 
     .editor-wrapper {
       position: relative;
-      flex: 1;
+      width: 100%;
       display: flex;
       flex-direction: column;
     }
@@ -297,11 +300,11 @@
 <body>
   <!-- Main Editor -->
   <div class="main">
-    <!-- User Code Box -->
+    <!-- Single Code Editor Box -->
     <div class="editor-wrapper" id="inputWrapper">
       <div class="editor-header">
-        <h3>📝 Original Code</h3>
-        <button class="copy-btn" id="copyInputBtn">📋 Copy code</button>
+        <h3>📝 Your Code</h3>
+        <button class="copy-btn" id="copyInputBtn">📋 Copy</button>
       </div>
       <div class="editor-container">
         <textarea id="codeInput" placeholder="Write or paste your code here..."></textarea>
@@ -311,18 +314,23 @@
       </div>
     </div>
 
-    <!-- Optimized Code Box -->
-    <div class="editor-wrapper" id="optimizedWrapper">
+    <!-- Optimizations Made Section (Below like compiler explanation) -->
+    <div class="editor-wrapper" id="optimizedWrapper" style="display: none;">
       <div class="editor-header">
-        <h3>✨ Optimized Code</h3>
-        <button class="copy-btn" id="copyOutputBtn">📋 Copy code</button>
+        <h3>✨ Optimizations Made</h3>
+        <button class="copy-btn" id="copyOutputBtn">📋 Copy Optimized Code</button>
+      </div>
+      
+      <!-- Optimizations Table -->
+      <div id="optimizationsContainer"></div>
+      
+      <!-- Optimized Code -->
+      <div class="editor-header" style="margin-top: 1.5rem; border-radius: 10px 10px 0 0;">
+        <h3>🎯 Optimized Code</h3>
       </div>
       <div class="editor-container">
         <textarea id="optimizedCode"></textarea>
       </div>
-      
-      <!-- Optimizations Table -->
-      <div id="optimizationsContainer" style="display: none;"></div>
     </div>
   </div>
 
@@ -494,8 +502,8 @@
 
       // Show loading state
       codeMirrorOutput.setValue("⏳ Optimizing your code...");
-      optimizedWrapper.style.display = "flex";
-      document.getElementById("optimizationsContainer").style.display = "none";
+      optimizedWrapper.style.display = "block";
+      document.getElementById("optimizationsContainer").innerHTML = '<div style="padding: 2rem; text-align: center; color: #888;">⏳ Analyzing and optimizing your code...</div>';
       
       // Refresh CodeMirror to ensure proper rendering
       setTimeout(() => codeMirrorOutput.refresh(), 100);
@@ -511,7 +519,7 @@
         
         if (data.error) {
           codeMirrorOutput.setValue(`❌ Error: ${data.error}\n\n${data.detail || ""}`);
-          document.getElementById("optimizationsContainer").style.display = "none";
+          document.getElementById("optimizationsContainer").innerHTML = '<div style="padding: 2rem; text-align: center; color: #ff6b6b;">❌ Failed to optimize code</div>';
         } else {
           // Display optimized code
           codeMirrorOutput.setValue(data.optimized || code);
@@ -520,7 +528,7 @@
           if (data.optimizations && data.optimizations.length > 0) {
             displayOptimizations(data.optimizations);
           } else {
-            document.getElementById("optimizationsContainer").style.display = "none";
+            document.getElementById("optimizationsContainer").innerHTML = '<div style="padding: 2rem; text-align: center; color: #10a37f;">✅ Your code is already optimized!</div>';
           }
         }
         
