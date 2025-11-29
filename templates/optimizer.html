@@ -300,37 +300,30 @@
 <body>
   <!-- Main Editor -->
   <div class="main">
-    <!-- Single Code Editor Box -->
-    <div class="editor-wrapper" id="inputWrapper">
+    <!-- Hidden Input for localStorage -->
+    <textarea id="codeInput" style="display: none;"></textarea>
+    
+    <!-- Optimized Code Box -->
+    <div class="editor-wrapper" id="optimizedWrapper">
       <div class="editor-header">
-        <h3>📝 Your Code</h3>
-        <button class="copy-btn" id="copyInputBtn">📋 Copy</button>
+        <h3>🎯 Optimized Code</h3>
+        <div>
+          <button class="copy-btn" id="copyOutputBtn">📋 Copy</button>
+          <button id="optimizeBtn" class="btn" style="margin-left: 0.5rem;">🚀 Re-Optimize</button>
+        </div>
       </div>
       <div class="editor-container">
-        <textarea id="codeInput" placeholder="Write or paste your code here..."></textarea>
-      </div>
-      <div class="btn-container">
-        <button id="optimizeBtn" class="btn">🚀 Optimize Code</button>
+        <textarea id="optimizedCode" placeholder="Optimized code will appear here..."></textarea>
       </div>
     </div>
 
-    <!-- Optimizations Made Section (Below like compiler explanation) -->
-    <div class="editor-wrapper" id="optimizedWrapper" style="display: none;">
+    <!-- Optimizations Made Section (Below) -->
+    <div class="editor-wrapper" id="optimizationsSection" style="display: none;">
       <div class="editor-header">
         <h3>✨ Optimizations Made</h3>
-        <button class="copy-btn" id="copyOutputBtn">📋 Copy Optimized Code</button>
       </div>
-      
       <!-- Optimizations Table -->
       <div id="optimizationsContainer"></div>
-      
-      <!-- Optimized Code -->
-      <div class="editor-header" style="margin-top: 1.5rem; border-radius: 10px 10px 0 0;">
-        <h3>🎯 Optimized Code</h3>
-      </div>
-      <div class="editor-container">
-        <textarea id="optimizedCode"></textarea>
-      </div>
     </div>
   </div>
 
@@ -351,12 +344,12 @@
       "c": "text/x-csrc"
     };
     
-    // Initialize CodeMirror for input editor
-    const codeMirrorInput = CodeMirror.fromTextArea(codeInputTextarea, {
+    // Initialize CodeMirror for optimized code output only
+    const codeMirrorOutput = CodeMirror.fromTextArea(optimizedCodeTextarea, {
       mode: "python",
       theme: "monokai",
       lineNumbers: true,
-      autofocus: true,
+      readOnly: false, // Allow editing of optimized code
       indentUnit: 4,
       tabSize: 4,
       lineWrapping: true,
@@ -436,32 +429,6 @@
         }
       }
     });
-    
-    // Initialize CodeMirror for output editor
-    const codeMirrorOutput = CodeMirror.fromTextArea(optimizedCodeTextarea, {
-      mode: "python",
-      theme: "monokai",
-      lineNumbers: true,
-      readOnly: true,
-      indentUnit: 4,
-      tabSize: 4,
-      lineWrapping: true,
-      matchBrackets: true,
-      styleActiveLine: true
-    });
-    
-    // Compatibility wrappers
-    const textarea = {
-      get value() { return codeMirrorInput.getValue(); },
-      set value(text) { codeMirrorInput.setValue(text); },
-      addEventListener: () => {} // Stub for compatibility
-    };
-    
-    const optimizedCodeBox = {
-      get value() { return codeMirrorOutput.getValue(); },
-      set value(text) { codeMirrorOutput.setValue(text); },
-      addEventListener: () => {} // Stub for compatibility
-    };
 
     // Load code from localStorage when page loads
     window.addEventListener("DOMContentLoaded", () => {
@@ -469,12 +436,12 @@
       const savedLanguage = localStorage.getItem("optimizeLanguage");
       
       if (savedCode) {
-        codeMirrorInput.setValue(savedCode);
+        // Store in hidden textarea for optimization
+        codeInputTextarea.value = savedCode;
         
         // Set language mode if available
         if (savedLanguage) {
           const mode = languageModeMap[savedLanguage.toLowerCase()] || "python";
-          codeMirrorInput.setOption("mode", mode);
           codeMirrorOutput.setOption("mode", mode);
         }
         
@@ -484,6 +451,9 @@
         
         // Auto-optimize the loaded code
         optimizeCode();
+      } else {
+        // Show placeholder message
+        codeMirrorOutput.setValue("// Paste your code in the compiler and click 'Optimize' button\n// Or go back and write some code to optimize");
       }
     });
 
@@ -494,15 +464,15 @@
 
     // Optimize function - calls backend API
     async function optimizeCode() {
-      const code = codeMirrorInput.getValue().trim();
+      const code = codeInputTextarea.value.trim();
       if (!code) {
-        alert("⚠️ Please write or paste some code first.");
+        codeMirrorOutput.setValue("⚠️ No code to optimize.\n\nPlease go to the compiler page and click 'Optimize' button.");
         return;
       }
 
       // Show loading state
       codeMirrorOutput.setValue("⏳ Optimizing your code...");
-      optimizedWrapper.style.display = "block";
+      document.getElementById("optimizationsSection").style.display = "none";
       document.getElementById("optimizationsContainer").innerHTML = '<div style="padding: 2rem; text-align: center; color: #888;">⏳ Analyzing and optimizing your code...</div>';
       
       // Refresh CodeMirror to ensure proper rendering
@@ -520,11 +490,13 @@
         if (data.error) {
           codeMirrorOutput.setValue(`❌ Error: ${data.error}\n\n${data.detail || ""}`);
           document.getElementById("optimizationsContainer").innerHTML = '<div style="padding: 2rem; text-align: center; color: #ff6b6b;">❌ Failed to optimize code</div>';
+          document.getElementById("optimizationsSection").style.display = "block";
         } else {
           // Display optimized code
           codeMirrorOutput.setValue(data.optimized || code);
           
           // Display optimizations table
+          document.getElementById("optimizationsSection").style.display = "block";
           if (data.optimizations && data.optimizations.length > 0) {
             displayOptimizations(data.optimizations);
           } else {
@@ -536,7 +508,7 @@
         setTimeout(() => codeMirrorOutput.refresh(), 100);
       } catch (err) {
         codeMirrorOutput.setValue(`❌ Failed to optimize: ${err.message}`);
-        document.getElementById("optimizationsContainer").style.display = "none";
+        document.getElementById("optimizationsSection").style.display = "none";
         setTimeout(() => codeMirrorOutput.refresh(), 100);
       }
     }
@@ -585,23 +557,7 @@
     // Optimize button click handler
     document.getElementById("optimizeBtn").addEventListener("click", optimizeCode);
 
-    // Copy Input
-    document.getElementById("copyInputBtn").addEventListener("click", () => {
-      navigator.clipboard.writeText(codeMirrorInput.getValue()).then(() => {
-        const btn = document.getElementById("copyInputBtn");
-        const originalText = btn.textContent;
-        btn.textContent = "✓ Copied!";
-        btn.style.background = "#10a37f";
-        btn.style.color = "#fff";
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.style.background = "";
-          btn.style.color = "";
-        }, 2000);
-      });
-    });
-
-    // Copy Output
+    // Copy Optimized Code
     document.getElementById("copyOutputBtn").addEventListener("click", () => {
       navigator.clipboard.writeText(codeMirrorOutput.getValue()).then(() => {
         const btn = document.getElementById("copyOutputBtn");
