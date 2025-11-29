@@ -19,9 +19,9 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Use gemini-2.0-flash-exp - experimental model with better JSON formatting
-    gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
-    print("✅ Gemini AI enabled: gemini-2.0-flash-exp")
+    # Use gemini-1.5-flash - stable model with better free tier limits
+    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+    print("✅ Gemini AI enabled: gemini-1.5-flash")
 else:
     gemini_model = None
     print("⚠️ WARNING: GEMINI_API_KEY not found in .env file. AI features will be disabled.")
@@ -1355,6 +1355,15 @@ Be thorough, specific, and constructive. Focus on actionable feedback."""
         }), 500
     except Exception as e:
         print(f"Quality Analysis Error: {e}")
+        error_msg = str(e)
+        
+        # Check for quota/rate limit errors
+        if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+            return jsonify({
+                "error": "API Rate Limit Exceeded",
+                "detail": "You've reached the Gemini API free tier limit. Please wait 15-30 seconds and try again, or upgrade your API plan."
+            }), 429
+        
         return jsonify({
             "error": "Quality analysis failed",
             "detail": str(e)
@@ -1514,6 +1523,15 @@ Now generate the trace for the code above. Remember: ONLY JSON, no other text.""
         print(f"[VISUALIZE] Error type: {type(e).__name__}")
         import traceback
         traceback.print_exc()
+        
+        error_msg = str(e)
+        
+        # Check for quota/rate limit errors
+        if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+            return jsonify({
+                "error": "API Rate Limit Exceeded",
+                "detail": "You've reached the Gemini API free tier limit. Please wait 15-30 seconds and try again, or upgrade your API plan."
+            }), 429
         
         return jsonify({
             "error": "Visualization failed",
