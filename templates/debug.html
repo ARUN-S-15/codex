@@ -422,18 +422,21 @@
 
   <!-- MAIN LAYOUT -->
   <div class="main-container">
-    <!-- Code Editor Section -->
+    <!-- Hidden Input for localStorage -->
+    <textarea id="codeInput" style="display: none;"></textarea>
+    
+    <!-- Debugged/Fixed Code Section -->
     <div class="editor-section">
-      <h3 style="color: #10a37f; margin-bottom: 0.5rem;">📝 Your Code</h3>
+      <h3 style="color: #10a37f; margin-bottom: 0.5rem;">� Debugged Code</h3>
       <div class="editor-container">
         <button class="copy-btn" id="copyFixedBtn">📋 Copy</button>
-        <textarea id="codeInput"></textarea>
+        <textarea id="debuggedCode" placeholder="Debugged code will appear here..."></textarea>
       </div>
-      <button id="debugBtn">🐞 Analyze & Debug Code</button>
+      <button id="debugBtn">🐞 Re-Debug Code</button>
     </div>
 
     <!-- Issues Found Section (Below) -->
-    <div class="results" id="results">
+    <div class="results" id="results" style="display: none;">
       <div class="result-box">
         <h3>🔍 Issues Found</h3>
         <div style="position: relative;">
@@ -456,9 +459,9 @@
   const issuesBox = document.getElementById("issues");
   const results = document.getElementById("results");
   const codeInputTextarea = document.getElementById("codeInput");
+  const debuggedCodeTextarea = document.getElementById("debuggedCode");
 
   let currentLanguage = "python"; // default
-  let originalCode = ""; // Store original code
   
   // ============================================
   // CODEMIRROR INITIALIZATION
@@ -472,12 +475,12 @@
     "c": "text/x-csrc"
   };
   
-  // Initialize CodeMirror
-  const codeMirrorEditor = CodeMirror.fromTextArea(codeInputTextarea, {
+  // Initialize CodeMirror for debugged code only
+  const codeMirrorDebuggedCode = CodeMirror.fromTextArea(debuggedCodeTextarea, {
     mode: "python",
     theme: "monokai",
     lineNumbers: true,
-    autofocus: true,
+    readOnly: false,
     indentUnit: 4,
     tabSize: 4,
     lineWrapping: true,
@@ -563,14 +566,6 @@
       }
     }
   });
-  
-  // Wrapper for compatibility with existing code
-  const codeInput = {
-    get value() { return codeMirrorEditor.getValue(); },
-    set value(text) { codeMirrorEditor.setValue(text); },
-    addEventListener: () => {}, // Stub for compatibility
-    scrollTop: 0
-  };
 
   // Load code from localStorage if available (sent from compiler page)
   window.addEventListener("DOMContentLoaded", () => {
@@ -578,14 +573,14 @@
     const savedLanguage = localStorage.getItem("debugLanguage");
     
     if (savedCode) {
-      originalCode = savedCode;
-      codeMirrorEditor.setValue(savedCode);
+      // Store in hidden textarea
+      codeInputTextarea.value = savedCode;
       
       // Detect and set language mode
       if (savedLanguage) {
         currentLanguage = savedLanguage.toLowerCase();
         const mode = languageModeMap[currentLanguage] || "python";
-        codeMirrorEditor.setOption("mode", mode);
+        codeMirrorDebuggedCode.setOption("mode", mode);
       }
       
       // Auto-run debug analysis
@@ -705,13 +700,13 @@
 
   // Debug analysis function
   async function runDebugAnalysis(code = null) {
-    const codeToAnalyze = code || originalCode;
+    const codeToAnalyze = code || codeInputTextarea.value.trim();
     
     console.log("Running debug analysis with code:", codeToAnalyze ? "Code present" : "No code");
     
     if (!codeToAnalyze || !codeToAnalyze.trim()) {
       issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ No code to analyze.<br><br>Go to the <a href="/compiler" style="color: #10a37f;">compiler page</a> and click the Debug button.</div>';
-      codeInput.value = "";
+      codeMirrorDebuggedCode.setValue("");
       results.style.display = "block";
       return;
     }
@@ -744,15 +739,15 @@
       const data = await response.json();
       console.log("Debug response received:", data);
       
-      // Display auto-fixed code in editor
+      // Display auto-fixed code in debugged code editor
       if (data.fixed_code) {
-        codeMirrorEditor.setValue(data.fixed_code);
+        codeMirrorDebuggedCode.setValue(data.fixed_code);
       } else {
-        codeMirrorEditor.setValue("# Unable to auto-fix\n\n" + codeToAnalyze);
+        codeMirrorDebuggedCode.setValue("# Unable to auto-fix\n\n" + codeToAnalyze);
       }
       
       // Refresh CodeMirror
-      setTimeout(() => codeMirrorEditor.refresh(), 100);
+      setTimeout(() => codeMirrorDebuggedCode.refresh(), 100);
       
       // Display issues found by linter in right panel with better formatting
       const issuesText = data.issues || "✅ No issues found! Your code looks good.";
@@ -811,21 +806,18 @@
 
   // Debug button handler - re-analyze current code
   debugBtn.addEventListener("click", () => {
-    const currentCode = codeInput.value.trim();
-    if (currentCode && !currentCode.startsWith("⏳") && !currentCode.startsWith("Auto-fixed") && !currentCode.startsWith("#")) {
-      originalCode = currentCode;
+    const currentCode = codeInputTextarea.value.trim();
+    if (currentCode) {
       runDebugAnalysis(currentCode);
-    } else if (originalCode) {
-      runDebugAnalysis(originalCode);
     } else {
-      issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ No code to analyze.<br><br>Please go to the <a href="/compiler" style="color: #10a37f;">compiler page</a> and click the Debug button, or paste your code above.</div>';
+      issuesBox.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ffa500;">⚠️ No code to analyze.<br><br>Please go to the <a href="/compiler" style="color: #10a37f;">compiler page</a> and click the Debug button.</div>';
       results.style.display = "block";
     }
   });
 
   // Copy Buttons with better feedback
   document.getElementById("copyFixedBtn").addEventListener("click", () => {
-    navigator.clipboard.writeText(codeMirrorEditor.getValue()).then(() => {
+    navigator.clipboard.writeText(codeMirrorDebuggedCode.getValue()).then(() => {
       const btn = document.getElementById("copyFixedBtn");
       const originalText = btn.textContent;
       btn.textContent = "✓ Copied!";
